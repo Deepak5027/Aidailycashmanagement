@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Progress } from "../components/ui/progress";
@@ -9,7 +10,6 @@ import {
   ShoppingCart,
   Plus,
 } from "lucide-react";
-import { transactions, budgets, categorySpending, weeklyData, insights } from "../data/mockData";
 import {
   BarChart,
   Bar,
@@ -25,6 +25,9 @@ import {
   Line,
 } from "recharts";
 import { Link } from "react-router";
+import { transactionsAPI, budgetsAPI, aiAPI } from "../../services/api";
+import { useAuth } from "../contexts/AuthContext";
+import { toast } from "sonner";
 
 const COLORS = [
   "#10b981",
@@ -39,6 +42,39 @@ const COLORS = [
 ];
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [budgets, setBudgets] = useState<any[]>([]);
+  const [insights, setInsights] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [txResponse, budgetResponse, insightsResponse] = await Promise.all([
+        transactionsAPI.getAll(),
+        budgetsAPI.getAll(),
+        aiAPI.getInsights(),
+      ]);
+
+      setTransactions(txResponse.transactions || []);
+      setBudgets(budgetResponse.budgets || []);
+      setInsights(insightsResponse.insights || []);
+    } catch (error: any) {
+      console.error('Failed to load dashboard data:', error);
+      toast.error('Failed to load data. Using demo mode.');
+      // Set empty arrays as fallback
+      setTransactions([]);
+      setBudgets([]);
+      setInsights([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const totalIncome = transactions
     .filter((t) => t.type === "income")
     .reduce((sum, t) => sum + t.amount, 0);
@@ -57,14 +93,25 @@ export default function Dashboard() {
     )
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const suspiciousTransactions = transactions.filter((t) => t.riskScore > 0.7);
+  const suspiciousTransactions = transactions.filter((t) => (t.risk_score || t.riskScore || 0) > 0.7);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your financial data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold">Welcome back, Alex!</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold">Welcome back, {user?.name || 'User'}!</h1>
           <p className="text-gray-600 mt-1">Here's your financial overview</p>
         </div>
         <Link to="/app/transactions">

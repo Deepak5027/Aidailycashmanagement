@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { useNavigate } from "react-router";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -15,13 +17,48 @@ import {
   Globe,
   CreditCard,
   Settings,
+  LogOut,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "../contexts/AuthContext";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "../components/ui/alert-dialog";
 
 export default function Profile() {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const [loggingOut, setLoggingOut] = useState(false);
+
   const handleSave = () => {
     toast.success("Profile updated successfully!");
   };
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    const { error } = await signOut();
+
+    if (error) {
+      toast.error('Failed to logout');
+      setLoggingOut(false);
+    } else {
+      toast.success('Logged out successfully');
+      navigate('/login');
+    }
+  };
+
+  const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
+  const userEmail = user?.email || 'user@example.com';
+  const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -36,15 +73,20 @@ export default function Profile() {
         <div className="flex items-center gap-6">
           <Avatar className="w-20 h-20">
             <AvatarFallback className="bg-gradient-to-br from-blue-600 to-purple-600 text-white text-2xl">
-              AM
+              {userInitials}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1">
-            <h2 className="text-xl font-bold">Alex Morgan</h2>
-            <p className="text-gray-600">alex.morgan@example.com</p>
-            <p className="text-sm text-gray-500 mt-1">Member since January 2026</p>
+            <h2 className="text-xl font-bold">{userName}</h2>
+            <p className="text-gray-600">{userEmail}</p>
+            <p className="text-sm text-gray-500 mt-1">
+              Member since {new Date(user?.created_at || Date.now()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </p>
           </div>
-          <Button variant="outline">Change Photo</Button>
+          <Button variant="outline" onClick={handleLogout} disabled={loggingOut}>
+            <LogOut className="w-4 h-4 mr-2" />
+            {loggingOut ? 'Logging out...' : 'Logout'}
+          </Button>
         </div>
       </Card>
 

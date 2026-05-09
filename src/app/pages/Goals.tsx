@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -27,77 +27,129 @@ import {
   Star,
 } from "lucide-react";
 import { toast } from "sonner";
+import { goalsAPI } from "../../utils/api/transactions";
+import confetti from "canvas-confetti";
 
 interface Goal {
   id: string;
   name: string;
-  target: number;
-  current: number;
+  target_amount: number;
+  current_amount: number;
   deadline: string;
   category: string;
-  emoji: string;
 }
 
 export default function Goals() {
-  const [goals, setGoals] = useState<Goal[]>([
-    {
-      id: "1",
-      name: "Emergency Fund",
-      target: 10000,
-      current: 7850,
-      deadline: "2026-12-31",
-      category: "savings",
-      emoji: "🏦",
-    },
-    {
-      id: "2",
-      name: "Vacation to Japan",
-      target: 5000,
-      current: 2300,
-      deadline: "2026-08-15",
-      category: "travel",
-      emoji: "✈️",
-    },
-    {
-      id: "3",
-      name: "New Laptop",
-      target: 2000,
-      current: 1850,
-      deadline: "2026-05-30",
-      category: "tech",
-      emoji: "💻",
-    },
-  ]);
-
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [addAmount, setAddAmount] = useState<Record<string, string>>({});
   const [newGoal, setNewGoal] = useState({
     name: "",
     target: "",
     deadline: "",
-    emoji: "🎯",
+    category: "savings",
   });
 
-  const handleAddGoal = () => {
+  useEffect(() => {
+    loadGoals();
+  }, []);
+
+  const loadGoals = async () => {
+    try {
+      const response = await goalsAPI.getAll();
+      setGoals(response.goals || []);
+    } catch (error) {
+      console.error('Failed to load goals:', error);
+      toast.error('Failed to load goals');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddGoal = async () => {
     if (!newGoal.name || !newGoal.target || !newGoal.deadline) {
       toast.error("Please fill in all fields");
       return;
     }
 
-    const goal: Goal = {
-      id: String(goals.length + 1),
-      name: newGoal.name,
-      target: parseFloat(newGoal.target),
-      current: 0,
-      deadline: newGoal.deadline,
-      category: "custom",
-      emoji: newGoal.emoji,
-    };
+    try {
+      await goalsAPI.create({
+        name: newGoal.name,
+        target_amount: parseFloat(newGoal.target),
+        current_amount: 0,
+        deadline: new Date(newGoal.deadline).toISOString(),
+        category: newGoal.category,
+      });
 
-    setGoals([...goals, goal]);
-    setIsAddDialogOpen(false);
-    setNewGoal({ name: "", target: "", deadline: "", emoji: "🎯" });
-    toast.success("Goal created successfully!");
+      await loadGoals();
+      setIsAddDialogOpen(false);
+      setNewGoal({ name: "", target: "", deadline: "", category: "savings" });
+      toast.success("Goal created successfully!");
+    } catch (error) {
+      toast.error('Failed to create goal');
+    }
   };
+
+  const handleAddMoney = async (goalId: string) => {
+    const amount = parseFloat(addAmount[goalId] || "0");
+    if (amount <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
+
+    try {
+      const goal = goals.find(g => g.id === goalId);
+      if (!goal) return;
+
+      const newAmount = goal.current_amount_amount + amount;
+      await goalsAPI.update(goalId, {
+        current_amount: newAmount,
+      });
+
+      // Check if goal is achieved
+      if (newAmount >= goal.target_amount_amount && goal.current_amount_amount < goal.target_amount_amount) {
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+        toast.success(`🎉 Congratulations! You've achieved your "${goal.name}" goal!`);
+      } else {
+        toast.success("Progress updated!");
+      }
+
+      await loadGoals();
+      setAddAmount({ ...addAmount, [goalId]: "" });
+    } catch (error) {
+      toast.error('Failed to update progress');
+    }
+  };
+
+  const getCategoryEmoji = (category: string) => {
+    const emojis: Record<string, string> = {
+      savings: "🏦",
+      travel: "✈️",
+      tech: "💻",
+      home: "🏠",
+      car: "🚗",
+      education: "📚",
+      health: "💪",
+      custom: "🎯",
+    };
+    return emojis[category] || "🎯";
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading goals...</p>
+        </div>
+      </div>
+    );
+  }
 
   const totalSaved = goals.reduce((sum, g) => sum + g.current, 0);
   const totalTarget = goals.reduce((sum, g) => sum + g.target, 0);
@@ -250,23 +302,23 @@ export default function Goals() {
       {/* Goals List */}
       <div className="grid gap-4">
         {goals.map((goal) => {
-          const progress = (goal.current / goal.target) * 100;
+          const progress = (goal.current_amount / goal.target_amount) * 100;
           const daysLeft = Math.ceil(
             (new Date(goal.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
           );
           const monthlyRequired =
-            daysLeft > 0 ? ((goal.target - goal.current) / daysLeft) * 30 : 0;
+            daysLeft > 0 ? ((goal.target_amount - goal.current_amount) / daysLeft) * 30 : 0;
 
           return (
             <Card key={goal.id} className="p-6">
               <div className="space-y-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="text-4xl">{goal.emoji}</div>
+                    <div className="text-4xl">{getCategoryEmoji(goal.category)}</div>
                     <div>
                       <h3 className="font-bold text-xl">{goal.name}</h3>
                       <p className="text-sm text-gray-600">
-                        ${goal.current.toLocaleString()} of ${goal.target.toLocaleString()}
+                        ${goal.current_amount.toLocaleString()} of ${goal.target_amount.toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -293,7 +345,7 @@ export default function Goals() {
                       <DollarSign className="w-4 h-4 text-gray-600" />
                       <span className="text-sm text-gray-600">Remaining</span>
                     </div>
-                    <p className="font-bold">${(goal.target - goal.current).toLocaleString()}</p>
+                    <p className="font-bold">${(goal.target_amount - goal.current_amount).toLocaleString()}</p>
                   </div>
                   <div className="p-3 bg-blue-50 rounded-lg">
                     <div className="flex items-center justify-center gap-1 mb-1">
@@ -310,20 +362,29 @@ export default function Goals() {
                       <span className="text-sm text-green-600">Progress</span>
                     </div>
                     <p className="font-bold text-green-600">
-                      +${(goal.current * 0.05).toFixed(0)} this week
+                      +${(goal.current_amount * 0.05).toFixed(0)} this week
                     </p>
                   </div>
                 </div>
 
-                <div className="flex gap-3">
-                  <Button className="flex-1" size="sm">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Funds
-                  </Button>
-                  <Button variant="outline" size="sm" className="flex-1">
-                    Edit Goal
-                  </Button>
-                </div>
+                {progress < 100 && (
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      placeholder="Amount"
+                      value={addAmount[goal.id] || ""}
+                      onChange={(e) => setAddAmount({ ...addAmount, [goal.id]: e.target.value })}
+                      className="flex-1"
+                    />
+                    <Button
+                      onClick={() => handleAddMoney(goal.id)}
+                      size="sm"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add
+                    </Button>
+                  </div>
+                )}
               </div>
             </Card>
           );

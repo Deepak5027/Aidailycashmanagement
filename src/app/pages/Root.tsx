@@ -12,6 +12,8 @@ import {
   Mic,
   Brain,
   Target,
+  Bot,
+  Upload,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { useState } from "react";
@@ -23,9 +25,11 @@ const navigation = [
   { name: "Goals", path: "/app/goals", icon: Target },
   { name: "Alerts", path: "/app/alerts", icon: AlertTriangle },
   { name: "Scanner", path: "/app/scanner", icon: ScanLine },
+  { name: "Bank Import", path: "/app/import", icon: Upload },
   { name: "Analytics", path: "/app/analytics", icon: BarChart3 },
   { name: "Voice Entry", path: "/app/voice", icon: Mic },
   { name: "AI Insights", path: "/app/insights", icon: Brain },
+  { name: "AI Chatbot", path: "/app/chatbot", icon: Bot },
   { name: "Profile", path: "/app/profile", icon: User },
 ];
 

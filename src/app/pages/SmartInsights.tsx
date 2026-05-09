@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -14,9 +15,39 @@ import {
   DollarSign,
   Award,
 } from "lucide-react";
+import { aiAPI } from "../../services/api";
+import { toast } from "sonner";
 
 export default function SmartInsights() {
-  const insights = [
+  const [insights, setInsights] = useState<any[]>([]);
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [predictions, setPredictions] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadInsights();
+  }, []);
+
+  const loadInsights = async () => {
+    try {
+      const [insightsRes, analyticsRes, predictionsRes] = await Promise.all([
+        aiAPI.getInsights(),
+        aiAPI.getAnalytics(),
+        aiAPI.predictSpending(),
+      ]);
+
+      setInsights(insightsRes.insights || []);
+      setAnalytics(analyticsRes.analytics || {});
+      setPredictions(predictionsRes.predictions || {});
+    } catch (error: any) {
+      console.error('Failed to load insights:', error);
+      toast.error('Failed to load AI insights');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const mockInsights = [
     {
       type: "warning",
       title: "Unusual Spending Pattern Detected",
@@ -96,6 +127,45 @@ export default function SmartInsights() {
     { day: "Sunday", spending: 95, prediction: 85 },
   ];
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading AI insights...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const healthScore = analytics?.financial_health_score || 78;
+  const scoreLabel = healthScore >= 80 ? 'Excellent' : healthScore >= 60 ? 'Good' : 'Needs Work';
+
+  // Map insight types to icons
+  const getInsightIcon = (type: string) => {
+    switch (type) {
+      case 'fraud_alert':
+        return AlertTriangle;
+      case 'budget_alert':
+        return Target;
+      case 'spending_pattern':
+      case 'spending_trend':
+        return TrendingUp;
+      case 'savings_opportunity':
+        return DollarSign;
+      default:
+        return Lightbulb;
+    }
+  };
+
+  // Map priority to variant
+  const getInsightVariant = (priority: string) => {
+    if (priority === 'critical') return 'warning';
+    if (priority === 'high') return 'warning';
+    if (priority === 'medium') return 'info';
+    return 'success';
+  };
+
   return (
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
@@ -113,30 +183,30 @@ export default function SmartInsights() {
             </div>
             <div>
               <h3 className="text-2xl font-bold">Financial Health Score</h3>
-              <p className="text-white/80">AI-calculated based on 50+ factors</p>
+              <p className="text-white/80">AI-calculated based on your financial data</p>
             </div>
           </div>
           <div className="text-right">
-            <div className="text-5xl font-bold">78</div>
-            <div className="text-white/80">Good</div>
+            <div className="text-5xl font-bold">{healthScore}</div>
+            <div className="text-white/80">{scoreLabel}</div>
           </div>
         </div>
         <div className="mt-6 grid grid-cols-4 gap-4">
           <div>
-            <div className="text-white/80 text-sm">Spending</div>
-            <div className="text-xl font-bold">72</div>
+            <div className="text-white/80 text-sm">Income</div>
+            <div className="text-xl font-bold">${analytics?.total_income?.toFixed(0) || 0}</div>
+          </div>
+          <div>
+            <div className="text-white/80 text-sm">Expenses</div>
+            <div className="text-xl font-bold">${analytics?.total_expense?.toFixed(0) || 0}</div>
           </div>
           <div>
             <div className="text-white/80 text-sm">Savings</div>
-            <div className="text-xl font-bold">85</div>
+            <div className="text-xl font-bold">${analytics?.net_savings?.toFixed(0) || 0}</div>
           </div>
           <div>
-            <div className="text-white/80 text-sm">Budgeting</div>
-            <div className="text-xl font-bold">68</div>
-          </div>
-          <div>
-            <div className="text-white/80 text-sm">Habits</div>
-            <div className="text-xl font-bold">82</div>
+            <div className="text-white/80 text-sm">Savings Rate</div>
+            <div className="text-xl font-bold">{analytics?.savings_rate?.toFixed(0) || 0}%</div>
           </div>
         </div>
       </Card>
@@ -144,52 +214,62 @@ export default function SmartInsights() {
       {/* Priority Insights */}
       <div className="space-y-4">
         <h2 className="text-xl font-bold">Priority Insights</h2>
-        <div className="grid gap-4">
-          {insights.map((insight, idx) => (
-            <Card
-              key={idx}
-              className={`p-6 ${
-                insight.type === "warning"
-                  ? "border-orange-300 bg-orange-50"
-                  : insight.type === "success"
-                  ? "border-green-300 bg-green-50"
-                  : "border-blue-300 bg-blue-50"
-              }`}
-            >
-              <div className="flex items-start gap-4">
-                <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                    insight.type === "warning"
-                      ? "bg-orange-200"
-                      : insight.type === "success"
-                      ? "bg-green-200"
-                      : "bg-blue-200"
+        {insights.length === 0 ? (
+          <Card className="p-8 text-center text-gray-500">
+            <Lightbulb className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+            <p>No insights yet. Add some transactions to get AI-powered recommendations!</p>
+          </Card>
+        ) : (
+          <div className="grid gap-4">
+            {insights.map((insight, idx) => {
+              const Icon = getInsightIcon(insight.type);
+              const variant = getInsightVariant(insight.priority);
+              return (
+                <Card
+                  key={idx}
+                  className={`p-6 ${
+                    variant === "warning"
+                      ? "border-orange-300 bg-orange-50"
+                      : variant === "success"
+                      ? "border-green-300 bg-green-50"
+                      : "border-blue-300 bg-blue-50"
                   }`}
                 >
-                  <insight.icon
-                    className={`w-6 h-6 ${
-                      insight.type === "warning"
-                        ? "text-orange-700"
-                        : insight.type === "success"
-                        ? "text-green-700"
-                        : "text-blue-700"
-                    }`}
-                  />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="font-bold text-lg">{insight.title}</h3>
-                    <Badge variant={insight.priority === "high" ? "destructive" : "default"}>
-                      {insight.priority}
-                    </Badge>
+                  <div className="flex items-start gap-4">
+                    <div
+                      className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                        variant === "warning"
+                          ? "bg-orange-200"
+                          : variant === "success"
+                          ? "bg-green-200"
+                          : "bg-blue-200"
+                      }`}
+                    >
+                      <Icon
+                        className={`w-6 h-6 ${
+                          variant === "warning"
+                            ? "text-orange-700"
+                            : variant === "success"
+                            ? "text-green-700"
+                            : "text-blue-700"
+                        }`}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="font-bold text-lg">{insight.title}</h3>
+                        <Badge variant={insight.priority === "critical" || insight.priority === "high" ? "destructive" : "default"}>
+                          {insight.priority}
+                        </Badge>
+                      </div>
+                      <p className="text-gray-700 mb-3">{insight.description}</p>
+                    </div>
                   </div>
-                  <p className="text-gray-700 mb-3">{insight.description}</p>
-                  <Button size="sm">{insight.action}</Button>
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Savings Recommendations */}

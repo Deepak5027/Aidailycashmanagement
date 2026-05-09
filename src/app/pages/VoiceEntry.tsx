@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Mic, MicOff, Volume2, CheckCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { categories } from "../data/mockData";
+import { transactionsAPI, aiAPI } from "../../services/api";
 
 export default function VoiceEntry() {
   const [isListening, setIsListening] = useState(false);
@@ -16,36 +17,72 @@ export default function VoiceEntry() {
     confidence: number;
   } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [browserSupported, setBrowserSupported] = useState(true);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    // Check if browser supports Web Speech API
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setBrowserSupported(false);
+      return;
+    }
+
+    // Initialize speech recognition
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event: any) => {
+      const speechResult = event.results[0][0].transcript;
+      setTranscript(speechResult);
+      setIsListening(false);
+      setIsProcessing(true);
+
+      // Process the speech result
+      setTimeout(() => {
+        const parsed = parseVoiceInput(speechResult);
+        setParsedData(parsed);
+        setIsProcessing(false);
+        toast.success("Voice input processed successfully!");
+      }, 500);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      setIsListening(false);
+      setIsProcessing(false);
+      toast.error(`Voice recognition error: ${event.error}`);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
 
   const handleVoiceInput = () => {
+    if (!browserSupported) {
+      toast.error('Your browser does not support voice recognition');
+      return;
+    }
+
     if (!isListening) {
       setIsListening(true);
       setTranscript("");
       setParsedData(null);
-
-      // Simulate voice recognition
-      setTimeout(() => {
-        const sampleTranscripts = [
-          "I spent 45 dollars at Starbucks for coffee",
-          "Paid 120 dollars for groceries at Whole Foods",
-          "Gas station Shell 65 dollars",
-          "Netflix subscription 15.99",
-        ];
-        const randomTranscript =
-          sampleTranscripts[Math.floor(Math.random() * sampleTranscripts.length)];
-        setTranscript(randomTranscript);
-        setIsListening(false);
-        setIsProcessing(true);
-
-        // Simulate AI processing
-        setTimeout(() => {
-          const parsed = parseVoiceInput(randomTranscript);
-          setParsedData(parsed);
-          setIsProcessing(false);
-          toast.success("Voice input processed successfully!");
-        }, 1500);
-      }, 2000);
+      recognitionRef.current?.start();
+      toast.info('Listening... Speak now!');
     } else {
+      recognitionRef.current?.stop();
       setIsListening(false);
     }
   };
@@ -80,10 +117,37 @@ export default function VoiceEntry() {
     return { merchant, amount, category, confidence };
   };
 
-  const handleSave = () => {
-    toast.success("Transaction saved from voice input!");
-    setTranscript("");
-    setParsedData(null);
+  const handleSave = async () => {
+    if (!parsedData) return;
+
+    try {
+      const transactionData = {
+        merchant: parsedData.merchant,
+        amount: parsedData.amount,
+        category: parsedData.category,
+        date: new Date().toISOString(),
+        type: 'expense',
+        payment_mode: 'Cash',
+      };
+
+      // Analyze fraud risk
+      const fraudAnalysis = await aiAPI.analyzeFraud(transactionData);
+
+      // Save transaction
+      await transactionsAPI.create({
+        ...transactionData,
+        risk_score: fraudAnalysis.risk_score,
+        status: fraudAnalysis.status,
+        notes: `Added via voice input: "${transcript}"`,
+      });
+
+      toast.success("Transaction saved from voice input!");
+      setTranscript("");
+      setParsedData(null);
+    } catch (error: any) {
+      toast.error('Failed to save transaction');
+      console.error('Save error:', error);
+    }
   };
 
   return (

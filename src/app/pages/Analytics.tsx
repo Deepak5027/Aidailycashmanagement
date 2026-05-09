@@ -1,4 +1,5 @@
 import { Card } from "../components/ui/card";
+import { Button } from "../components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import {
   Select,
@@ -10,7 +11,7 @@ import {
 import {
   categorySpending,
   monthlyData,
-  transactions,
+  transactions as mockTransactions,
   categories,
 } from "../data/mockData";
 import {
@@ -30,8 +31,11 @@ import {
   Area,
   AreaChart,
 } from "recharts";
-import { TrendingUp, TrendingDown, DollarSign, ShoppingBag } from "lucide-react";
-import { useState } from "react";
+import { TrendingUp, TrendingDown, DollarSign, ShoppingBag, Download } from "lucide-react";
+import { useState, useEffect } from "react";
+import { transactionAPI } from "../../utils/api/transactions";
+import { toast } from "sonner";
+import jsPDF from "jspdf";
 
 const COLORS = [
   "#3b82f6",
@@ -47,6 +51,24 @@ const COLORS = [
 
 export default function Analytics() {
   const [timeRange, setTimeRange] = useState("month");
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadTransactions();
+  }, []);
+
+  const loadTransactions = async () => {
+    try {
+      const response = await transactionAPI.getAll();
+      setTransactions(response.transactions || []);
+    } catch (error) {
+      console.error('Failed to load transactions:', error);
+      toast.error('Failed to load analytics data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const totalSpent = transactions
     .filter((t) => t.type === "expense")
@@ -57,7 +79,7 @@ export default function Analytics() {
     .reduce((sum, t) => sum + t.amount, 0);
 
   const avgTransaction =
-    totalSpent / transactions.filter((t) => t.type === "expense").length;
+    totalSpent / (transactions.filter((t) => t.type === "expense").length || 1);
 
   const topMerchants = transactions
     .filter((t) => t.type === "expense")
@@ -74,6 +96,105 @@ export default function Analytics() {
     .sort((a, b) => b.total - a.total)
     .slice(0, 5);
 
+  const generatePDFReport = () => {
+    toast.info('Generating PDF report...');
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Title
+    doc.setFontSize(24);
+    doc.setTextColor(59, 130, 246);
+    doc.text('FinanceAI Monthly Report', pageWidth / 2, 20, { align: 'center' });
+
+    // Date
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, pageWidth / 2, 28, { align: 'center' });
+
+    // Financial Summary
+    doc.setFontSize(16);
+    doc.setTextColor(0);
+    doc.text('Financial Summary', 20, 45);
+
+    doc.setFontSize(11);
+    doc.setTextColor(60);
+    const summaryY = 55;
+    doc.text(`Total Income: $${totalIncome.toFixed(2)}`, 20, summaryY);
+    doc.text(`Total Expenses: $${totalSpent.toFixed(2)}`, 20, summaryY + 7);
+    doc.text(`Net Balance: $${(totalIncome - totalExpenses).toFixed(2)}`, 20, summaryY + 14);
+    doc.text(`Savings Rate: ${((totalIncome - totalSpent) / totalIncome * 100).toFixed(1)}%`, 20, summaryY + 21);
+    doc.text(`Average Transaction: $${avgTransaction.toFixed(2)}`, 20, summaryY + 28);
+    doc.text(`Total Transactions: ${transactions.length}`, 20, summaryY + 35);
+
+    // Top Merchants
+    doc.setFontSize(16);
+    doc.setTextColor(0);
+    doc.text('Top Merchants', 20, 110);
+
+    doc.setFontSize(10);
+    doc.setTextColor(60);
+    let merchantY = 120;
+    topMerchants.forEach((merchant, index) => {
+      doc.text(
+        `${index + 1}. ${merchant.merchant} - $${merchant.total.toFixed(2)} (${merchant.count} transactions)`,
+        20,
+        merchantY
+      );
+      merchantY += 7;
+    });
+
+    // Category Breakdown
+    const categoryData: Record<string, number> = {};
+    transactions.filter(t => t.type === 'expense').forEach(t => {
+      categoryData[t.category] = (categoryData[t.category] || 0) + t.amount;
+    });
+
+    doc.setFontSize(16);
+    doc.setTextColor(0);
+    doc.text('Spending by Category', 20, merchantY + 15);
+
+    doc.setFontSize(10);
+    doc.setTextColor(60);
+    let categoryY = merchantY + 25;
+    Object.entries(categoryData)
+      .sort(([, a], [, b]) => b - a)
+      .forEach(([category, amount], index) => {
+        const percentage = (amount / totalSpent * 100).toFixed(1);
+        doc.text(
+          `${category}: $${amount.toFixed(2)} (${percentage}%)`,
+          20,
+          categoryY
+        );
+        categoryY += 7;
+      });
+
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text(
+      'Powered by FinanceAI - Your AI-Powered Personal Finance Assistant',
+      pageWidth / 2,
+      280,
+      { align: 'center' }
+    );
+
+    // Save PDF
+    doc.save(`FinanceAI_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+    toast.success('PDF report downloaded!');
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading analytics...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
@@ -82,16 +203,22 @@ export default function Analytics() {
           <h1 className="text-2xl lg:text-3xl font-bold">Analytics & Reports</h1>
           <p className="text-gray-600 mt-1">Deep insights into your spending patterns</p>
         </div>
-        <Select value={timeRange} onValueChange={setTimeRange}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="week">This Week</SelectItem>
-            <SelectItem value="month">This Month</SelectItem>
-            <SelectItem value="year">This Year</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex gap-3">
+          <Button onClick={generatePDFReport} variant="outline">
+            <Download className="w-4 h-4 mr-2" />
+            Export PDF
+          </Button>
+          <Select value={timeRange} onValueChange={setTimeRange}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="week">This Week</SelectItem>
+              <SelectItem value="month">This Month</SelectItem>
+              <SelectItem value="year">This Year</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Key Metrics */}

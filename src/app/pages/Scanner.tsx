@@ -13,6 +13,8 @@ import {
 import { Camera, Upload, CheckCircle, Loader2, ScanLine, X, Image as ImageIcon } from "lucide-react";
 import { categories } from "../data/mockData";
 import { toast } from "sonner";
+import { createWorker } from "tesseract.js";
+import { transactionsAPI, receiptsAPI, aiAPI } from "../../services/api";
 
 export default function Scanner() {
   const [isScanning, setIsScanning] = useState(false);
@@ -43,8 +45,9 @@ export default function Scanner() {
       // Create preview
       const reader = new FileReader();
       reader.onload = (e) => {
-        setUploadedImage(e.target?.result as string);
-        processReceipt();
+        const imageData = e.target?.result as string;
+        setUploadedImage(imageData);
+        processReceiptImage(imageData);
       };
       reader.readAsDataURL(file);
     }
@@ -54,56 +57,136 @@ export default function Scanner() {
     fileInputRef.current?.click();
   };
 
-  const processReceipt = () => {
+  const processReceiptImage = async (imageData: string) => {
     setIsScanning(true);
     toast.info('Processing receipt with OCR...');
-    
-    // Simulate OCR processing with AI
-    setTimeout(() => {
-      // Simulate different receipt types
-      const receiptTypes = [
-        {
-          merchant: "Whole Foods Market",
-          amount: "87.45",
-          date: new Date().toISOString().split("T")[0],
-          category: "groceries",
-        },
-        {
-          merchant: "Target",
-          amount: "125.99",
-          date: new Date().toISOString().split("T")[0],
-          category: "shopping",
-        },
-        {
-          merchant: "Shell Gas Station",
-          amount: "65.00",
-          date: new Date().toISOString().split("T")[0],
-          category: "fuel",
-        },
-        {
-          merchant: "CVS Pharmacy",
-          amount: "42.30",
-          date: new Date().toISOString().split("T")[0],
-          category: "healthcare",
-        },
-      ];
-      
-      const randomReceipt = receiptTypes[Math.floor(Math.random() * receiptTypes.length)];
-      setScannedData(randomReceipt);
+
+    try {
+      // Initialize Tesseract.js worker
+      const worker = await createWorker('eng');
+
+      // Perform OCR on the uploaded image
+      const { data: { text } } = await worker.recognize(imageData);
+      await worker.terminate();
+
+      // Extract information using AI/pattern matching
+      const extractedData = extractReceiptData(text);
+
+      setScannedData(extractedData);
       setIsScanning(false);
       toast.success("Receipt scanned successfully!");
-    }, 2500);
+    } catch (error: any) {
+      console.error('OCR Error:', error);
+      toast.error('Failed to process receipt. Please try again.');
+      setIsScanning(false);
+    }
+  };
+
+  const extractReceiptData = (text: string) => {
+    // Extract amount (look for currency patterns)
+    const amountMatch = text.match(/(?:total|amount|sum)[\s:]*\$?(\d+\.?\d*)/i);
+    const amount = amountMatch ? amountMatch[1] : "0.00";
+
+    // Extract date (look for date patterns)
+    const dateMatch = text.match(/(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/);
+    const extractedDate = dateMatch ? dateMatch[1] : new Date().toISOString().split("T")[0];
+
+    // Convert date to ISO format if needed
+    let date = new Date().toISOString().split("T")[0];
+    if (dateMatch) {
+      try {
+        const parsedDate = new Date(extractedDate);
+        if (!isNaN(parsedDate.getTime())) {
+          date = parsedDate.toISOString().split("T")[0];
+        }
+      } catch (e) {
+        // Use current date if parsing fails
+      }
+    }
+
+    // Extract merchant name (usually first line or before address)
+    const lines = text.split('\n').filter(line => line.trim().length > 0);
+    const merchant = lines[0]?.trim() || "Unknown Merchant";
+
+    // Auto-detect category based on merchant keywords
+    const category = detectCategory(merchant, text);
+
+    return {
+      merchant,
+      amount,
+      date,
+      category,
+    };
+  };
+
+  const detectCategory = (merchant: string, fullText: string) => {
+    const lowerText = (merchant + ' ' + fullText).toLowerCase();
+
+    // Category detection keywords
+    const categoryKeywords: Record<string, string[]> = {
+      groceries: ['grocery', 'supermarket', 'whole foods', 'trader joe', 'safeway', 'kroger', 'walmart', 'market'],
+      fuel: ['gas', 'shell', 'chevron', 'exxon', 'bp', 'mobil', 'fuel', 'petrol'],
+      healthcare: ['pharmacy', 'cvs', 'walgreens', 'hospital', 'medical', 'doctor', 'clinic', 'health'],
+      food: ['restaurant', 'cafe', 'pizza', 'burger', 'doordash', 'uber eats', 'grubhub', 'food', 'dining'],
+      shopping: ['target', 'walmart', 'amazon', 'mall', 'store', 'retail'],
+      bills: ['electric', 'water', 'internet', 'utility', 'bill', 'subscription'],
+      travel: ['uber', 'lyft', 'taxi', 'airline', 'hotel', 'airbnb'],
+    };
+
+    for (const [category, keywords] of Object.entries(categoryKeywords)) {
+      if (keywords.some(keyword => lowerText.includes(keyword))) {
+        return category;
+      }
+    }
+
+    return 'shopping'; // Default category
   };
 
   const handleScan = () => {
     handleUploadClick();
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!scannedData) return;
-    toast.success("Transaction saved from receipt!");
-    setScannedData(null);
-    setUploadedImage(null);
+
+    try {
+      const transactionData = {
+        merchant: scannedData.merchant,
+        amount: parseFloat(scannedData.amount),
+        category: scannedData.category,
+        date: new Date(scannedData.date).toISOString(),
+        type: 'expense',
+        payment_mode: 'Credit Card',
+      };
+
+      // Analyze fraud risk
+      const fraudAnalysis = await aiAPI.analyzeFraud(transactionData);
+
+      // Save transaction
+      const txResponse = await transactionsAPI.create({
+        ...transactionData,
+        risk_score: fraudAnalysis.risk_score,
+        status: fraudAnalysis.status,
+        notes: 'Added from receipt scanner',
+      });
+
+      // Save receipt data
+      await receiptsAPI.save({
+        transaction_id: txResponse.transaction.id,
+        merchant: scannedData.merchant,
+        amount: parseFloat(scannedData.amount),
+        date: scannedData.date,
+        image_data: uploadedImage,
+        ocr_text: `Merchant: ${scannedData.merchant}\nAmount: $${scannedData.amount}\nDate: ${scannedData.date}`,
+      });
+
+      toast.success("Transaction and receipt saved successfully!");
+      setScannedData(null);
+      setUploadedImage(null);
+    } catch (error: any) {
+      toast.error('Failed to save transaction');
+      console.error('Save error:', error);
+    }
   };
 
   const handleReset = () => {

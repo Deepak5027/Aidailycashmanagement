@@ -1,6 +1,8 @@
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, Navigate } from "react-router";
 import Root from "./pages/Root";
 import Landing from "./pages/Landing";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
 import Budget from "./pages/Budget";
@@ -11,6 +13,9 @@ import Profile from "./pages/Profile";
 import VoiceEntry from "./pages/VoiceEntry";
 import SmartInsights from "./pages/SmartInsights";
 import Goals from "./pages/Goals";
+import Chatbot from "./pages/Chatbot";
+import BankImport from "./pages/BankImport";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 export const router = createBrowserRouter([
   {
@@ -18,8 +23,16 @@ export const router = createBrowserRouter([
     element: <Landing />,
   },
   {
+    path: "/login",
+    element: <Login />,
+  },
+  {
+    path: "/signup",
+    element: <Signup />,
+  },
+  {
     path: "/app",
-    element: <Root />,
+    element: <ProtectedRoute><Root /></ProtectedRoute>,
     children: [
       { index: true, element: <Dashboard /> },
       { path: "transactions", element: <Transactions /> },
@@ -30,6 +43,8 @@ export const router = createBrowserRouter([
       { path: "voice", element: <VoiceEntry /> },
       { path: "insights", element: <SmartInsights /> },
       { path: "goals", element: <Goals /> },
+      { path: "chatbot", element: <Chatbot /> },
+      { path: "import", element: <BankImport /> },
       { path: "profile", element: <Profile /> },
     ],
   },

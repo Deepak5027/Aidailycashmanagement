@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -20,7 +20,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "../components/ui/dialog";
-import { transactions as mockTransactions, categories } from "../data/mockData";
+import { categories } from "../data/mockData";
 import {
   Plus,
   Search,
@@ -32,9 +32,11 @@ import {
   Edit,
 } from "lucide-react";
 import { toast } from "sonner";
+import { transactionsAPI, aiAPI } from "../../services/api";
 
 export default function Transactions() {
-  const [transactions, setTransactions] = useState(mockTransactions);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterType, setFilterType] = useState("all");
@@ -48,6 +50,22 @@ export default function Transactions() {
     paymentMode: "",
   });
 
+  useEffect(() => {
+    loadTransactions();
+  }, []);
+
+  const loadTransactions = async () => {
+    try {
+      const response = await transactionsAPI.getAll();
+      setTransactions(response.transactions || []);
+    } catch (error: any) {
+      console.error('Failed to load transactions:', error);
+      toast.error('Failed to load transactions');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredTransactions = transactions.filter((transaction) => {
     const matchesSearch = transaction.merchant
       .toLowerCase()
@@ -58,7 +76,7 @@ export default function Transactions() {
     return matchesSearch && matchesCategory && matchesType;
   });
 
-  const handleAddTransaction = () => {
+  const handleAddTransaction = async () => {
     if (
       !newTransaction.merchant ||
       !newTransaction.amount ||
@@ -69,34 +87,68 @@ export default function Transactions() {
       return;
     }
 
-    const transaction = {
-      id: String(transactions.length + 1),
-      merchant: newTransaction.merchant,
-      amount: parseFloat(newTransaction.amount),
-      category: newTransaction.category,
-      type: newTransaction.type as "income" | "expense",
-      paymentMode: newTransaction.paymentMode,
-      date: new Date().toISOString(),
-      riskScore: Math.random() * 0.2, // Low risk for manual entries
-      status: "normal" as const,
-    };
+    try {
+      const transactionData = {
+        merchant: newTransaction.merchant,
+        amount: parseFloat(newTransaction.amount),
+        category: newTransaction.category,
+        type: newTransaction.type,
+        payment_mode: newTransaction.paymentMode,
+        date: new Date().toISOString(),
+      };
 
-    setTransactions([transaction, ...transactions]);
-    setIsAddDialogOpen(false);
-    setNewTransaction({
-      merchant: "",
-      amount: "",
-      category: "",
-      type: "expense",
-      paymentMode: "",
-    });
-    toast.success("Transaction added successfully!");
+      // Analyze fraud risk
+      const fraudAnalysis = await aiAPI.analyzeFraud(transactionData);
+
+      // Create transaction with fraud analysis
+      const response = await transactionsAPI.create({
+        ...transactionData,
+        risk_score: fraudAnalysis.risk_score,
+        status: fraudAnalysis.status,
+      });
+
+      setTransactions([response.transaction, ...transactions]);
+      setIsAddDialogOpen(false);
+      setNewTransaction({
+        merchant: "",
+        amount: "",
+        category: "",
+        type: "expense",
+        paymentMode: "",
+      });
+
+      if (fraudAnalysis.status === 'suspicious') {
+        toast.warning("Transaction added but flagged as suspicious!");
+      } else {
+        toast.success("Transaction added successfully!");
+      }
+    } catch (error: any) {
+      console.error('Failed to add transaction:', error);
+      toast.error(error.message || 'Failed to add transaction');
+    }
   };
 
-  const handleDeleteTransaction = (id: string) => {
-    setTransactions(transactions.filter((t) => t.id !== id));
-    toast.success("Transaction deleted");
+  const handleDeleteTransaction = async (id: string) => {
+    try {
+      await transactionsAPI.delete(id);
+      setTransactions(transactions.filter((t) => t.id !== id));
+      toast.success("Transaction deleted");
+    } catch (error: any) {
+      console.error('Failed to delete transaction:', error);
+      toast.error('Failed to delete transaction');
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading transactions...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -308,7 +360,7 @@ export default function Transactions() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="font-medium">{transaction.merchant}</p>
-                      {transaction.riskScore > 0.7 && (
+                      {(transaction.risk_score || transaction.riskScore || 0) > 0.7 && (
                         <Badge variant="destructive" className="text-xs">
                           <AlertTriangle className="w-3 h-3 mr-1" />
                           High Risk
@@ -318,7 +370,7 @@ export default function Transactions() {
                     <div className="flex flex-wrap gap-2 text-sm text-gray-500">
                       <span className="capitalize">{transaction.category}</span>
                       <span>•</span>
-                      <span>{transaction.paymentMode}</span>
+                      <span>{transaction.payment_mode || transaction.paymentMode}</span>
                       <span>•</span>
                       <span>{new Date(transaction.date).toLocaleString()}</span>
                     </div>
@@ -334,9 +386,9 @@ export default function Transactions() {
                       {transaction.type === "income" ? "+" : "-"}$
                       {transaction.amount.toFixed(2)}
                     </p>
-                    {transaction.riskScore > 0.5 && (
+                    {(transaction.risk_score || transaction.riskScore || 0) > 0.5 && (
                       <p className="text-xs text-orange-600">
-                        Risk: {(transaction.riskScore * 100).toFixed(0)}%
+                        Risk: {((transaction.risk_score || transaction.riskScore) * 100).toFixed(0)}%
                       </p>
                     )}
                   </div>
