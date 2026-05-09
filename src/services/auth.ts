@@ -1,5 +1,8 @@
-import { supabase } from '../../utils/supabase/client';
-import { projectId } from '../../utils/supabase/info';
+import { supabase } from "../../utils/supabase/client";
+import {
+  projectId,
+  publicAnonKey,
+} from "../../utils/supabase/info";
 
 export interface User {
   id: string;
@@ -27,14 +30,17 @@ class AuthService {
 
   private async loadSession() {
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
 
       if (session && !error) {
         this.state = {
           user: {
             id: session.user.id,
-            email: session.user.email || '',
-            name: session.user.user_metadata?.name || '',
+            email: session.user.email || "",
+            name: session.user.user_metadata?.name || "",
           },
           accessToken: session.access_token,
           isAuthenticated: true,
@@ -42,51 +48,60 @@ class AuthService {
         this.notifyListeners();
       }
     } catch (error) {
-      console.error('Session load error:', error);
+      console.error("Session load error:", error);
     }
   }
 
-  async signup(email: string, password: string, name: string): Promise<{ success: boolean; error?: string }> {
+  async signup(
+    email: string,
+    password: string,
+    name: string,
+  ): Promise<{ success: boolean; error?: string }> {
     try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-be23ac86/auth/signup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`,
-        },
-        body: JSON.stringify({ email, password, name }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return { success: false, error: data.error || 'Signup failed' };
-      }
-
-      // After signup, sign in automatically
-      return await this.login(email, password);
-    } catch (error: any) {
-      console.error('Signup error:', error);
-      return { success: false, error: error.message || 'Signup failed' };
-    }
-  }
-
-  async login(email: string, password: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: { name },
+        },
       });
 
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return await this.login(email, password);
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || "Signup failed",
+      };
+    }
+  }
+
+  async login(
+    email: string,
+    password: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { data, error } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
       if (error || !data.session) {
-        return { success: false, error: error?.message || 'Login failed' };
+        return {
+          success: false,
+          error: error?.message || "Login failed",
+        };
       }
 
       this.state = {
         user: {
           id: data.user.id,
-          email: data.user.email || '',
-          name: data.user.user_metadata?.name || '',
+          email: data.user.email || "",
+          name: data.user.user_metadata?.name || "",
         },
         accessToken: data.session.access_token,
         isAuthenticated: true,
@@ -99,8 +114,11 @@ class AuthService {
 
       return { success: true };
     } catch (error: any) {
-      console.error('Login error:', error);
-      return { success: false, error: error.message || 'Login failed' };
+      console.error("Login error:", error);
+      return {
+        success: false,
+        error: error.message || "Login failed",
+      };
     }
   }
 
@@ -116,7 +134,7 @@ class AuthService {
 
       this.notifyListeners();
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
     }
   }
 
@@ -124,14 +142,17 @@ class AuthService {
     if (!this.state.accessToken) return;
 
     try {
-      await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-be23ac86/seed-demo-data`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.state.accessToken}`,
+      await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-be23ac86/seed-demo-data`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.state.accessToken}`,
+          },
         },
-      });
+      );
     } catch (error) {
-      console.log('Demo data seed (may already exist):', error);
+      console.log("Demo data seed (may already exist):", error);
     }
   }
 
@@ -142,12 +163,14 @@ class AuthService {
   subscribe(listener: (state: AuthState) => void) {
     this.listeners.push(listener);
     return () => {
-      this.listeners = this.listeners.filter(l => l !== listener);
+      this.listeners = this.listeners.filter(
+        (l) => l !== listener,
+      );
     };
   }
 
   private notifyListeners() {
-    this.listeners.forEach(listener => listener(this.state));
+    this.listeners.forEach((listener) => listener(this.state));
   }
 }
 
