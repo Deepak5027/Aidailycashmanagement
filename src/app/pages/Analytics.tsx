@@ -1,6 +1,11 @@
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "../components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -31,7 +36,13 @@ import {
   Area,
   AreaChart,
 } from "recharts";
-import { TrendingUp, TrendingDown, DollarSign, ShoppingBag, Download } from "lucide-react";
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  ShoppingBag,
+  Download,
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import { transactionAPI } from "../../utils/api/transactions";
 import { toast } from "sonner";
@@ -63,8 +74,8 @@ export default function Analytics() {
       const response = await transactionAPI.getAll();
       setTransactions(response.transactions || []);
     } catch (error) {
-      console.error('Failed to load transactions:', error);
-      toast.error('Failed to load analytics data');
+      console.error("Failed to load transactions:", error);
+      toast.error("Failed to load analytics data");
     } finally {
       setLoading(false);
     }
@@ -79,17 +90,25 @@ export default function Analytics() {
     .reduce((sum, t) => sum + t.amount, 0);
 
   const avgTransaction =
-    totalSpent / (transactions.filter((t) => t.type === "expense").length || 1);
+    totalSpent /
+    (transactions.filter((t) => t.type === "expense").length ||
+      1);
 
   const topMerchants = transactions
     .filter((t) => t.type === "expense")
     .reduce((acc: any[], t) => {
-      const existing = acc.find((m) => m.merchant === t.merchant);
+      const existing = acc.find(
+        (m) => m.merchant === t.merchant,
+      );
       if (existing) {
         existing.total += t.amount;
         existing.count += 1;
       } else {
-        acc.push({ merchant: t.merchant, total: t.amount, count: 1 });
+        acc.push({
+          merchant: t.merchant,
+          total: t.amount,
+          count: 1,
+        });
       }
       return acc;
     }, [])
@@ -97,7 +116,7 @@ export default function Analytics() {
     .slice(0, 5);
 
   const generatePDFReport = () => {
-    toast.info('Generating PDF report...');
+    toast.info("Generating PDF report...");
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -105,32 +124,63 @@ export default function Analytics() {
     // Title
     doc.setFontSize(24);
     doc.setTextColor(59, 130, 246);
-    doc.text('FinanceAI Monthly Report', pageWidth / 2, 20, { align: 'center' });
+    doc.text("FinanceAI Monthly Report", pageWidth / 2, 20, {
+      align: "center",
+    });
 
     // Date
     doc.setFontSize(10);
     doc.setTextColor(100);
-    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, pageWidth / 2, 28, { align: 'center' });
+    doc.text(
+      `Generated on: ${new Date().toLocaleDateString()}`,
+      pageWidth / 2,
+      28,
+      { align: "center" },
+    );
 
     // Financial Summary
     doc.setFontSize(16);
     doc.setTextColor(0);
-    doc.text('Financial Summary', 20, 45);
+    doc.text("Financial Summary", 20, 45);
 
     doc.setFontSize(11);
     doc.setTextColor(60);
     const summaryY = 55;
-    doc.text(`Total Income: $${totalIncome.toFixed(2)}`, 20, summaryY);
-    doc.text(`Total Expenses: $${totalSpent.toFixed(2)}`, 20, summaryY + 7);
-    doc.text(`Net Balance: $${(totalIncome - totalExpenses).toFixed(2)}`, 20, summaryY + 14);
-    doc.text(`Savings Rate: ${((totalIncome - totalSpent) / totalIncome * 100).toFixed(1)}%`, 20, summaryY + 21);
-    doc.text(`Average Transaction: $${avgTransaction.toFixed(2)}`, 20, summaryY + 28);
-    doc.text(`Total Transactions: ${transactions.length}`, 20, summaryY + 35);
+    doc.text(
+      `Total Income: $${totalIncome.toFixed(2)}`,
+      20,
+      summaryY,
+    );
+    doc.text(
+      `Total Expenses: $${totalSpent.toFixed(2)}`,
+      20,
+      summaryY + 7,
+    );
+    doc.text(
+      `Net Balance: $${(totalIncome - totalSpent).toFixed(2)}`,
+      20,
+      summaryY + 14,
+    );
+    doc.text(
+      `Savings Rate: ${(((totalIncome - totalSpent) / totalIncome) * 100).toFixed(1)}%`,
+      20,
+      summaryY + 21,
+    );
+    doc.text(
+      `Average Transaction: $${avgTransaction.toFixed(2)}`,
+      20,
+      summaryY + 28,
+    );
+    doc.text(
+      `Total Transactions: ${transactions.length}`,
+      20,
+      summaryY + 35,
+    );
 
     // Top Merchants
     doc.setFontSize(16);
     doc.setTextColor(0);
-    doc.text('Top Merchants', 20, 110);
+    doc.text("Top Merchants", 20, 110);
 
     doc.setFontSize(10);
     doc.setTextColor(60);
@@ -139,20 +189,23 @@ export default function Analytics() {
       doc.text(
         `${index + 1}. ${merchant.merchant} - $${merchant.total.toFixed(2)} (${merchant.count} transactions)`,
         20,
-        merchantY
+        merchantY,
       );
       merchantY += 7;
     });
 
     // Category Breakdown
     const categoryData: Record<string, number> = {};
-    transactions.filter(t => t.type === 'expense').forEach(t => {
-      categoryData[t.category] = (categoryData[t.category] || 0) + t.amount;
-    });
+    transactions
+      .filter((t) => t.type === "expense")
+      .forEach((t) => {
+        categoryData[t.category] =
+          (categoryData[t.category] || 0) + t.amount;
+      });
 
     doc.setFontSize(16);
     doc.setTextColor(0);
-    doc.text('Spending by Category', 20, merchantY + 15);
+    doc.text("Spending by Category", 20, merchantY + 15);
 
     doc.setFontSize(10);
     doc.setTextColor(60);
@@ -160,11 +213,14 @@ export default function Analytics() {
     Object.entries(categoryData)
       .sort(([, a], [, b]) => b - a)
       .forEach(([category, amount], index) => {
-        const percentage = (amount / totalSpent * 100).toFixed(1);
+        const percentage = (
+          (amount / totalSpent) *
+          100
+        ).toFixed(1);
         doc.text(
           `${category}: $${amount.toFixed(2)} (${percentage}%)`,
           20,
-          categoryY
+          categoryY,
         );
         categoryY += 7;
       });
@@ -173,15 +229,17 @@ export default function Analytics() {
     doc.setFontSize(8);
     doc.setTextColor(150);
     doc.text(
-      'Powered by FinanceAI - Your AI-Powered Personal Finance Assistant',
+      "Powered by FinanceAI - Your AI-Powered Personal Finance Assistant",
       pageWidth / 2,
       280,
-      { align: 'center' }
+      { align: "center" },
     );
 
     // Save PDF
-    doc.save(`FinanceAI_Report_${new Date().toISOString().split('T')[0]}.pdf`);
-    toast.success('PDF report downloaded!');
+    doc.save(
+      `FinanceAI_Report_${new Date().toISOString().split("T")[0]}.pdf`,
+    );
+    toast.success("PDF report downloaded!");
   };
 
   if (loading) {
@@ -200,15 +258,22 @@ export default function Analytics() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold">Analytics & Reports</h1>
-          <p className="text-gray-600 mt-1">Deep insights into your spending patterns</p>
+          <h1 className="text-2xl lg:text-3xl font-bold">
+            Analytics & Reports
+          </h1>
+          <p className="text-gray-600 mt-1">
+            Deep insights into your spending patterns
+          </p>
         </div>
         <div className="flex gap-3">
           <Button onClick={generatePDFReport} variant="outline">
             <Download className="w-4 h-4 mr-2" />
             Export PDF
           </Button>
-          <Select value={timeRange} onValueChange={setTimeRange}>
+          <Select
+            value={timeRange}
+            onValueChange={setTimeRange}
+          >
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>
@@ -226,8 +291,12 @@ export default function Analytics() {
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Spent</p>
-              <p className="text-2xl font-bold mt-1">${totalSpent.toLocaleString()}</p>
+              <p className="text-sm text-gray-600">
+                Total Spent
+              </p>
+              <p className="text-2xl font-bold mt-1">
+                ${totalSpent.toLocaleString()}
+              </p>
               <p className="text-sm text-red-600 mt-1 flex items-center">
                 <TrendingUp className="w-4 h-4 mr-1" />
                 +8.2% vs last month
@@ -242,8 +311,12 @@ export default function Analytics() {
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Income</p>
-              <p className="text-2xl font-bold mt-1">${totalIncome.toLocaleString()}</p>
+              <p className="text-sm text-gray-600">
+                Total Income
+              </p>
+              <p className="text-2xl font-bold mt-1">
+                ${totalIncome.toLocaleString()}
+              </p>
               <p className="text-sm text-green-600 mt-1 flex items-center">
                 <TrendingUp className="w-4 h-4 mr-1" />
                 +5.1% vs last month
@@ -258,9 +331,15 @@ export default function Analytics() {
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Avg Transaction</p>
-              <p className="text-2xl font-bold mt-1">${avgTransaction.toFixed(2)}</p>
-              <p className="text-sm text-gray-500 mt-1">Per transaction</p>
+              <p className="text-sm text-gray-600">
+                Avg Transaction
+              </p>
+              <p className="text-2xl font-bold mt-1">
+                ${avgTransaction.toFixed(2)}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                Per transaction
+              </p>
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
               <ShoppingBag className="w-6 h-6 text-blue-600" />
@@ -271,9 +350,15 @@ export default function Analytics() {
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Transactions</p>
-              <p className="text-2xl font-bold mt-1">{transactions.length}</p>
-              <p className="text-sm text-gray-500 mt-1">This month</p>
+              <p className="text-sm text-gray-600">
+                Transactions
+              </p>
+              <p className="text-2xl font-bold mt-1">
+                {transactions.length}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                This month
+              </p>
             </div>
             <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
               <BarChart className="w-6 h-6 text-purple-600" />
@@ -286,7 +371,9 @@ export default function Analytics() {
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
+          <TabsTrigger value="categories">
+            Categories
+          </TabsTrigger>
           <TabsTrigger value="trends">Trends</TabsTrigger>
           <TabsTrigger value="merchants">Merchants</TabsTrigger>
         </TabsList>
@@ -295,9 +382,11 @@ export default function Analytics() {
           <div className="grid lg:grid-cols-2 gap-4">
             {/* Monthly Spending Trend */}
             <Card className="p-6">
-              <h3 className="font-bold text-lg mb-4">Monthly Spending Trend</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={monthlyData}>
+              <h3 className="font-bold text-lg mb-4">
+                Monthly Spending Trend
+              </h3>
+              <ResponsiveContainer width="100%" height={300} key="monthly-area-chart">
+                <AreaChart data={monthlyData} id="monthly-spending-area">
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
@@ -309,6 +398,7 @@ export default function Analytics() {
                     fill="#3b82f6"
                     fillOpacity={0.2}
                     name="Spent"
+                    id="area-spent"
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -316,24 +406,28 @@ export default function Analytics() {
 
             {/* Category Distribution */}
             <Card className="p-6">
-              <h3 className="font-bold text-lg mb-4">Spending Distribution</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
+              <h3 className="font-bold text-lg mb-4">
+                Spending Distribution
+              </h3>
+              <ResponsiveContainer width="100%" height={300} key="analytics-pie-overview">
+                <PieChart id="analytics-category-pie">
                   <Pie
                     data={categorySpending}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percent }) =>
-                      `${name} ${(percent * 100).toFixed(0)}%`
+                    label={({ category, percent }) =>
+                      `${category} ${(percent * 100).toFixed(0)}%`
                     }
                     outerRadius={100}
                     fill="#8884d8"
                     dataKey="value"
+                    nameKey="category"
+                    id="pie-analytics-category"
                   >
                     {categorySpending.map((entry, index) => (
                       <Cell
-                        key={`cell-${index}`}
+                        key={`cell-analytics-${entry.category}-${index}`}
                         fill={COLORS[index % COLORS.length]}
                       />
                     ))}
@@ -347,14 +441,24 @@ export default function Analytics() {
 
         <TabsContent value="categories" className="space-y-4">
           <Card className="p-6">
-            <h3 className="font-bold text-lg mb-4">Spending by Category</h3>
-            <ResponsiveContainer width="100%" height={400}>
-              <BarChart data={categorySpending} layout="vertical">
+            <h3 className="font-bold text-lg mb-4">
+              Spending by Category
+            </h3>
+            <ResponsiveContainer width="100%" height={400} key="category-bar-chart">
+              <BarChart
+                data={categorySpending}
+                layout="vertical"
+                id="category-bar-chart"
+              >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" />
-                <YAxis dataKey="category" type="category" width={100} />
+                <YAxis
+                  dataKey="category"
+                  type="category"
+                  width={100}
+                />
                 <Tooltip />
-                <Bar dataKey="value" fill="#3b82f6" />
+                <Bar dataKey="value" fill="#3b82f6" id="bar-category-value" />
               </BarChart>
             </ResponsiveContainer>
           </Card>
@@ -362,14 +466,18 @@ export default function Analytics() {
           {/* Category Details */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {categorySpending.map((cat, idx) => {
-              const category = categories.find((c) => c.name === cat.category);
+              const category = categories.find(
+                (c) => c.name === cat.category,
+              );
               const percentage = (cat.value / totalSpent) * 100;
               return (
                 <Card key={cat.category} className="p-6">
                   <div className="flex items-start justify-between mb-3">
                     <div
                       className="w-10 h-10 rounded-full flex items-center justify-center"
-                      style={{ backgroundColor: `${COLORS[idx]}20` }}
+                      style={{
+                        backgroundColor: `${COLORS[idx]}20`,
+                      }}
                     >
                       <div
                         className="w-5 h-5 rounded-full"
@@ -377,13 +485,21 @@ export default function Analytics() {
                       />
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-bold">${cat.value.toFixed(2)}</p>
-                      <p className="text-sm text-gray-600">{percentage.toFixed(1)}%</p>
+                      <p className="text-2xl font-bold">
+                        ${cat.value.toFixed(2)}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {percentage.toFixed(1)}%
+                      </p>
                     </div>
                   </div>
                   <p className="font-medium">{cat.category}</p>
                   <p className="text-sm text-gray-600 mt-1">
-                    {transactions.filter((t) => t.category === category?.id).length}{" "}
+                    {
+                      transactions.filter(
+                        (t) => t.category === category?.id,
+                      ).length
+                    }{" "}
                     transactions
                   </p>
                 </Card>
@@ -394,9 +510,11 @@ export default function Analytics() {
 
         <TabsContent value="trends" className="space-y-4">
           <Card className="p-6">
-            <h3 className="font-bold text-lg mb-4">6-Month Spending History</h3>
-            <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={monthlyData}>
+            <h3 className="font-bold text-lg mb-4">
+              6-Month Spending History
+            </h3>
+            <ResponsiveContainer width="100%" height={400} key="trends-line-chart">
+              <LineChart data={monthlyData} id="trends-spending-line">
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
@@ -408,6 +526,7 @@ export default function Analytics() {
                   stroke="#3b82f6"
                   strokeWidth={3}
                   name="Spending"
+                  id="line-trends-spending"
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -415,15 +534,20 @@ export default function Analytics() {
 
           <div className="grid lg:grid-cols-2 gap-4">
             <Card className="p-6">
-              <h3 className="font-bold mb-4">Spending Insights</h3>
+              <h3 className="font-bold mb-4">
+                Spending Insights
+              </h3>
               <div className="space-y-4">
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-start gap-3">
                     <TrendingUp className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                     <div className="text-sm">
-                      <p className="font-medium text-blue-900">Highest Month</p>
+                      <p className="font-medium text-blue-900">
+                        Highest Month
+                      </p>
                       <p className="text-blue-700">
-                        December with $4,100 in expenses (+12.8% above average)
+                        December with $4,100 in expenses (+12.8%
+                        above average)
                       </p>
                     </div>
                   </div>
@@ -432,17 +556,24 @@ export default function Analytics() {
                   <div className="flex items-start gap-3">
                     <TrendingDown className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                     <div className="text-sm">
-                      <p className="font-medium text-green-900">Lowest Month</p>
+                      <p className="font-medium text-green-900">
+                        Lowest Month
+                      </p>
                       <p className="text-green-700">
-                        November with $3,200 in expenses (-15.4% below average)
+                        November with $3,200 in expenses (-15.4%
+                        below average)
                       </p>
                     </div>
                   </div>
                 </div>
                 <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
                   <div className="text-sm">
-                    <p className="font-medium text-purple-900">Average Monthly Spend</p>
-                    <p className="text-2xl font-bold text-purple-600 mt-1">$3,680</p>
+                    <p className="font-medium text-purple-900">
+                      Average Monthly Spend
+                    </p>
+                    <p className="text-2xl font-bold text-purple-600 mt-1">
+                      $3,680
+                    </p>
                   </div>
                 </div>
               </div>
@@ -452,16 +583,25 @@ export default function Analytics() {
               <h3 className="font-bold mb-4">AI Predictions</h3>
               <div className="space-y-4">
                 <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                  <p className="font-medium text-orange-900 mb-2">Next Month Forecast</p>
-                  <p className="text-3xl font-bold text-orange-600">$3,850</p>
+                  <p className="font-medium text-orange-900 mb-2">
+                    Next Month Forecast
+                  </p>
+                  <p className="text-3xl font-bold text-orange-600">
+                    $3,850
+                  </p>
                   <p className="text-sm text-orange-700 mt-1">
-                    Expected to be 4.6% higher than current month
+                    Expected to be 4.6% higher than current
+                    month
                   </p>
                 </div>
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="font-medium text-blue-900 mb-2">Categories to Watch</p>
+                  <p className="font-medium text-blue-900 mb-2">
+                    Categories to Watch
+                  </p>
                   <ul className="text-sm text-blue-700 space-y-1">
-                    <li>• Shopping: Trending up 15% this month</li>
+                    <li>
+                      • Shopping: Trending up 15% this month
+                    </li>
                     <li>• Food Delivery: 8% above average</li>
                     <li>• Travel: Expected spike next week</li>
                   </ul>
@@ -473,21 +613,36 @@ export default function Analytics() {
 
         <TabsContent value="merchants" className="space-y-4">
           <Card className="p-6">
-            <h3 className="font-bold text-lg mb-4">Top Merchants by Spending</h3>
+            <h3 className="font-bold text-lg mb-4">
+              Top Merchants by Spending
+            </h3>
             <div className="space-y-4">
               {topMerchants.map((merchant, idx) => (
-                <div key={merchant.merchant} className="flex items-center gap-4">
+                <div
+                  key={merchant.merchant}
+                  className="flex items-center gap-4"
+                >
                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-bold text-sm">
                     {idx + 1}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-1">
-                      <p className="font-medium">{merchant.merchant}</p>
-                      <p className="font-bold">${merchant.total.toFixed(2)}</p>
+                      <p className="font-medium">
+                        {merchant.merchant}
+                      </p>
+                      <p className="font-bold">
+                        ${merchant.total.toFixed(2)}
+                      </p>
                     </div>
                     <div className="flex items-center justify-between text-sm text-gray-600">
                       <p>{merchant.count} transactions</p>
-                      <p>${(merchant.total / merchant.count).toFixed(2)} avg</p>
+                      <p>
+                        $
+                        {(
+                          merchant.total / merchant.count
+                        ).toFixed(2)}{" "}
+                        avg
+                      </p>
                     </div>
                   </div>
                 </div>

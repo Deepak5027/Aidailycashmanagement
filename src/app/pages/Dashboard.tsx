@@ -56,9 +56,9 @@ export default function Dashboard() {
   const loadData = async () => {
     try {
       const [txResponse, budgetResponse, insightsResponse] = await Promise.all([
-        transactionsAPI.getAll(),
-        budgetsAPI.getAll(),
-        aiAPI.getInsights(),
+        transactionsAPI.getAll().catch(() => ({ transactions: [] })),
+        budgetsAPI.getAll().catch(() => ({ budgets: [] })),
+        aiAPI.getInsights().catch(() => ({ insights: [] })),
       ]);
 
       setTransactions(txResponse.transactions || []);
@@ -66,8 +66,7 @@ export default function Dashboard() {
       setInsights(insightsResponse.insights || []);
     } catch (error: any) {
       console.error('Failed to load dashboard data:', error);
-      toast.error('Failed to load data. Using demo mode.');
-      // Set empty arrays as fallback
+      // Continue with empty data - user can add transactions manually
       setTransactions([]);
       setBudgets([]);
       setInsights([]);
@@ -219,13 +218,13 @@ export default function Dashboard() {
         {/* Weekly Spending */}
         <Card className="p-6">
           <h3 className="font-bold text-lg mb-4">Weekly Spending Trend</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={weeklyData}>
+          <ResponsiveContainer width="100%" height={250} key="weekly-line-chart">
+            <LineChart data={weeklyData} id="weekly-spending-chart">
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="day" />
               <YAxis />
               <Tooltip />
-              <Line type="monotone" dataKey="spent" stroke="#3b82f6" strokeWidth={2} name="Actual" />
+              <Line type="monotone" dataKey="spent" stroke="#3b82f6" strokeWidth={2} name="Actual" id="line-actual" />
               <Line
                 type="monotone"
                 dataKey="predicted"
@@ -233,6 +232,7 @@ export default function Dashboard() {
                 strokeWidth={2}
                 strokeDasharray="5 5"
                 name="Predicted"
+                id="line-predicted"
               />
             </LineChart>
           </ResponsiveContainer>
@@ -251,20 +251,22 @@ export default function Dashboard() {
         {/* Category Distribution */}
         <Card className="p-6">
           <h3 className="font-bold text-lg mb-4">Spending by Category</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
+          <ResponsiveContainer width="100%" height={250} key="category-pie-chart">
+            <PieChart id="category-pie-chart">
               <Pie
                 data={categorySpending}
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={({ category, percent }) => `${category} ${(percent * 100).toFixed(0)}%`}
                 outerRadius={80}
                 fill="#8884d8"
                 dataKey="value"
+                nameKey="category"
+                id="pie-category-spending"
               >
                 {categorySpending.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  <Cell key={`dashboard-cell-${entry.category}-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip />
@@ -283,52 +285,64 @@ export default function Dashboard() {
             </Button>
           </Link>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {budgets.slice(0, 6).map((budget) => {
-            const percentage = (budget.spent / budget.limit) * 100;
-            const isOverBudget = percentage > 100;
-            return (
-              <div key={budget.category} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium capitalize">{budget.category}</span>
-                  <span className={`text-sm ${isOverBudget ? "text-red-600" : "text-gray-600"}`}>
-                    ${budget.spent} / ${budget.limit}
-                  </span>
+        {budgets.length === 0 ? (
+          <p className="text-sm text-gray-500 text-center py-8">
+            No budgets set yet. Create your first budget to start tracking spending.
+          </p>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {budgets.slice(0, 6).map((budget, index) => {
+              const percentage = (budget.spent / budget.limit) * 100;
+              const isOverBudget = percentage > 100;
+              return (
+                <div key={budget.id || `budget-${index}`} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium capitalize">{budget.category}</span>
+                    <span className={`text-sm ${isOverBudget ? "text-red-600" : "text-gray-600"}`}>
+                      ${budget.spent} / ${budget.limit}
+                    </span>
+                  </div>
+                  <Progress
+                    value={Math.min(percentage, 100)}
+                    className={isOverBudget ? "[&>div]:bg-red-500" : ""}
+                  />
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>{percentage.toFixed(0)}% used</span>
+                    <span>Predicted: ${budget.predicted || 0}</span>
+                  </div>
                 </div>
-                <Progress
-                  value={Math.min(percentage, 100)}
-                  className={isOverBudget ? "[&>div]:bg-red-500" : ""}
-                />
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span>{percentage.toFixed(0)}% used</span>
-                  <span>Predicted: ${budget.predicted}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </Card>
 
       {/* AI Insights */}
       <Card className="p-6">
         <h3 className="font-bold text-lg mb-4">AI-Powered Insights</h3>
-        <div className="space-y-3">
-          {insights.map((insight) => (
-            <div
-              key={insight.id}
-              className={`p-4 rounded-lg border ${
-                insight.type === "warning"
-                  ? "bg-orange-50 border-orange-200"
-                  : insight.type === "success"
-                  ? "bg-green-50 border-green-200"
-                  : "bg-blue-50 border-blue-200"
-              }`}
-            >
-              <h4 className="font-medium mb-1">{insight.title}</h4>
-              <p className="text-sm text-gray-600">{insight.description}</p>
-            </div>
-          ))}
-        </div>
+        {insights.length === 0 ? (
+          <p className="text-sm text-gray-500 text-center py-8">
+            No insights yet. Add some transactions to get AI-powered recommendations!
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {insights.map((insight, index) => (
+              <div
+                key={`insight-${index}-${insight.title}`}
+                className={`p-4 rounded-lg border ${
+                  insight.type === "warning" || insight.type === "budget_alert" || insight.type === "fraud_alert"
+                    ? "bg-orange-50 border-orange-200"
+                    : insight.type === "success" || insight.type === "savings_opportunity"
+                    ? "bg-green-50 border-green-200"
+                    : "bg-blue-50 border-blue-200"
+                }`}
+              >
+                <h4 className="font-medium mb-1">{insight.title}</h4>
+                <p className="text-sm text-gray-600">{insight.description}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
 
       {/* Recent Transactions */}
@@ -341,41 +355,53 @@ export default function Dashboard() {
             </Button>
           </Link>
         </div>
-        <div className="space-y-4">
-          {transactions.slice(0, 5).map((transaction) => (
-            <div key={transaction.id} className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    transaction.type === "income" ? "bg-green-100" : "bg-red-100"
-                  }`}
-                >
-                  {transaction.type === "income" ? (
-                    <ArrowUpRight className="w-5 h-5 text-green-600" />
-                  ) : (
-                    <ArrowDownRight className="w-5 h-5 text-red-600" />
-                  )}
+        {transactions.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-gray-500 mb-4">No transactions yet</p>
+            <Link to="/app/transactions">
+              <Button size="sm">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Your First Transaction
+              </Button>
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {transactions.slice(0, 5).map((transaction) => (
+              <div key={transaction.id} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      transaction.type === "income" ? "bg-green-100" : "bg-red-100"
+                    }`}
+                  >
+                    {transaction.type === "income" ? (
+                      <ArrowUpRight className="w-5 h-5 text-green-600" />
+                    ) : (
+                      <ArrowDownRight className="w-5 h-5 text-red-600" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium">{transaction.merchant}</p>
+                    <p className="text-sm text-gray-500 capitalize">{transaction.category}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium">{transaction.merchant}</p>
-                  <p className="text-sm text-gray-500 capitalize">{transaction.category}</p>
+                <div className="text-right">
+                  <p
+                    className={`font-medium ${
+                      transaction.type === "income" ? "text-green-600" : "text-gray-900"
+                    }`}
+                  >
+                    {transaction.type === "income" ? "+" : "-"}${transaction.amount.toFixed(2)}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {new Date(transaction.date).toLocaleDateString()}
+                  </p>
                 </div>
               </div>
-              <div className="text-right">
-                <p
-                  className={`font-medium ${
-                    transaction.type === "income" ? "text-green-600" : "text-gray-900"
-                  }`}
-                >
-                  {transaction.type === "income" ? "+" : "-"}${transaction.amount.toFixed(2)}
-                </p>
-                <p className="text-sm text-gray-500">
-                  {new Date(transaction.date).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );
