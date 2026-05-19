@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -20,9 +20,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "../components/ui/dialog";
-import { budgets as mockBudgets, categories } from "../data/mockData";
+import { categories } from "../data/mockData";
 import { Plus, TrendingUp, AlertCircle, CheckCircle, Edit } from "lucide-react";
 import { toast } from "sonner";
+import { budgetsAPI, transactionsAPI } from "../../services/api";
 import {
   BarChart,
   Bar,
@@ -35,14 +36,60 @@ import {
 } from "recharts";
 
 export default function Budget() {
-  const [budgets, setBudgets] = useState(mockBudgets);
+  const [budgets, setBudgets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newBudget, setNewBudget] = useState({
     category: "",
     limit: "",
+    period: "monthly",
   });
 
-  const handleAddBudget = () => {
+  useEffect(() => {
+    loadBudgets();
+  }, []);
+
+  const loadBudgets = async () => {
+    try {
+      const [budgetResponse, transactionResponse] = await Promise.all([
+        budgetsAPI.getAll(),
+        transactionsAPI.getAll(),
+      ]);
+
+      const budgetsData = budgetResponse.budgets || [];
+      const transactions = transactionResponse.transactions || [];
+
+      // Calculate spent and predicted for each budget
+      const budgetsWithCalculations = budgetsData.map((budget: any) => {
+        const categoryTransactions = transactions.filter(
+          (t: any) => t.type === 'expense' && t.category === budget.category
+        );
+
+        const spent = categoryTransactions.reduce((sum: number, t: any) => sum + t.amount, 0);
+
+        // Simple prediction: average daily spending * days remaining in month
+        const daysInMonth = 30;
+        const daysPassed = new Date().getDate();
+        const avgDailySpending = spent / daysPassed;
+        const predicted = avgDailySpending * daysInMonth;
+
+        return {
+          ...budget,
+          spent,
+          predicted: Math.round(predicted * 100) / 100,
+        };
+      });
+
+      setBudgets(budgetsWithCalculations);
+    } catch (error: any) {
+      console.error('Failed to load budgets:', error);
+      toast.error('Failed to load budgets');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddBudget = async () => {
     if (!newBudget.category || !newBudget.limit) {
       toast.error("Please fill in all fields");
       return;
@@ -54,17 +101,22 @@ export default function Budget() {
       return;
     }
 
-    const budget = {
-      category: newBudget.category,
-      limit: parseFloat(newBudget.limit),
-      spent: 0,
-      predicted: 0,
-    };
+    try {
+      const budgetData = {
+        category: newBudget.category,
+        limit: parseFloat(newBudget.limit),
+        period: newBudget.period,
+      };
 
-    setBudgets([...budgets, budget]);
-    setIsAddDialogOpen(false);
-    setNewBudget({ category: "", limit: "" });
-    toast.success("Budget created successfully!");
+      await budgetsAPI.create(budgetData);
+      await loadBudgets(); // Reload to get updated data
+      setIsAddDialogOpen(false);
+      setNewBudget({ category: "", limit: "", period: "monthly" });
+      toast.success("Budget created successfully!");
+    } catch (error: any) {
+      console.error('Failed to create budget:', error);
+      toast.error(error.message || 'Failed to create budget');
+    }
   };
 
   const totalBudget = budgets.reduce((sum, b) => sum + b.limit, 0);
@@ -77,6 +129,17 @@ export default function Budget() {
     Spent: budget.spent,
     Predicted: budget.predicted,
   }));
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading budgets...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-7xl">

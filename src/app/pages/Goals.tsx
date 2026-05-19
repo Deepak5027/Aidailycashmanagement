@@ -27,7 +27,7 @@ import {
   Star,
 } from "lucide-react";
 import { toast } from "sonner";
-import { goalsAPI } from "../../utils/api/transactions";
+import { goalsAPI } from "../../services/api";
 import confetti from "canvas-confetti";
 
 interface Goal {
@@ -102,13 +102,13 @@ export default function Goals() {
       const goal = goals.find(g => g.id === goalId);
       if (!goal) return;
 
-      const newAmount = goal.current_amount_amount + amount;
+      const newAmount = goal.current_amount + amount;
       await goalsAPI.update(goalId, {
         current_amount: newAmount,
       });
 
       // Check if goal is achieved
-      if (newAmount >= goal.target_amount_amount && goal.current_amount_amount < goal.target_amount_amount) {
+      if (newAmount >= goal.target_amount && goal.current_amount < goal.target_amount) {
         confetti({
           particleCount: 100,
           spread: 70,
@@ -151,9 +151,9 @@ export default function Goals() {
     );
   }
 
-  const totalSaved = goals.reduce((sum, g) => sum + g.current, 0);
-  const totalTarget = goals.reduce((sum, g) => sum + g.target, 0);
-  const overallProgress = (totalSaved / totalTarget) * 100;
+  const totalSaved = goals.reduce((sum, g) => sum + g.current_amount, 0);
+  const totalTarget = goals.reduce((sum, g) => sum + g.target_amount, 0);
+  const overallProgress = totalTarget > 0 ? (totalSaved / totalTarget) * 100 : 0;
 
   const streakDays = 47;
   const achievements = [
@@ -185,16 +185,6 @@ export default function Goals() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <div>
-                <Label htmlFor="emoji">Goal Emoji</Label>
-                <Input
-                  id="emoji"
-                  placeholder="🎯"
-                  value={newGoal.emoji}
-                  onChange={(e) => setNewGoal({ ...newGoal, emoji: e.target.value })}
-                  maxLength={2}
-                />
-              </div>
               <div>
                 <Label htmlFor="name">Goal Name</Label>
                 <Input

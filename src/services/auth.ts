@@ -1,5 +1,4 @@
-import { supabase } from '../../utils/supabase/client';
-import { projectId, publicAnonKey } from '../../utils/supabase/info';
+import { supabase } from '../lib/supabase';
 
 export interface User {
   id: string;
@@ -89,9 +88,6 @@ class AuthService {
 
       this.notifyListeners();
 
-      // Seed demo data for new users
-      await this.seedDemoDataIfNeeded();
-
       return { success: true };
     } catch (error: any) {
       console.error('Login error:', error);
@@ -112,21 +108,6 @@ class AuthService {
       this.notifyListeners();
     } catch (error) {
       console.error('Logout error:', error);
-    }
-  }
-
-  private async seedDemoDataIfNeeded() {
-    if (!this.state.accessToken) return;
-
-    try {
-      await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-be23ac86/seed-demo-data`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.state.accessToken}`,
-        },
-      });
-    } catch (error) {
-      console.log('Demo data seed (may already exist):', error);
     }
   }
 

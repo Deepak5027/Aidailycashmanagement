@@ -44,7 +44,7 @@ import {
   Download,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { transactionAPI } from "../../utils/api/transactions";
+import { transactionsAPI } from "../../services/api";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 
@@ -71,7 +71,7 @@ export default function Analytics() {
 
   const loadTransactions = async () => {
     try {
-      const response = await transactionAPI.getAll();
+      const response = await transactionsAPI.getAll();
       setTransactions(response.transactions || []);
     } catch (error) {
       console.error("Failed to load transactions:", error);

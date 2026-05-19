@@ -1,31 +1,95 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { alerts as mockAlerts } from "../data/mockData";
 import { AlertTriangle, ShieldAlert, CheckCircle, X, Info } from "lucide-react";
 import { toast } from "sonner";
+import { transactionsAPI } from "../../services/api";
 
 export default function Alerts() {
-  const [alerts, setAlerts] = useState(mockAlerts);
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleMarkSafe = (id: string) => {
-    setAlerts(
-      alerts.map((alert) =>
-        alert.id === id ? { ...alert, status: "acknowledged" as const } : alert
-      )
-    );
-    toast.success("Transaction marked as safe");
+  useEffect(() => {
+    loadAlerts();
+  }, []);
+
+  const loadAlerts = async () => {
+    try {
+      const response = await transactionsAPI.getAll();
+      const transactions = response.transactions || [];
+
+      // Convert suspicious transactions to alerts format
+      const suspiciousAlerts = transactions
+        .filter((t: any) => (t.risk_score || 0) > 0.5)
+        .map((t: any) => ({
+          id: t.id,
+          transactionId: t.id,
+          merchant: t.merchant,
+          amount: t.amount,
+          date: t.date,
+          reason: getRiskReason(t.risk_score),
+          severity: t.risk_score > 0.7 ? 'high' : 'medium',
+          status: t.status === 'suspicious' ? 'pending' : 'acknowledged',
+          riskScore: t.risk_score,
+        }));
+
+      setAlerts(suspiciousAlerts);
+    } catch (error: any) {
+      console.error('Failed to load alerts:', error);
+      toast.error('Failed to load alerts');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleReportFraud = (id: string) => {
-    setAlerts(alerts.filter((alert) => alert.id !== id));
-    toast.success("Fraud reported and transaction blocked");
+  const getRiskReason = (score: number) => {
+    if (score > 0.8) return 'Extremely unusual transaction pattern detected';
+    if (score > 0.7) return 'Transaction flagged due to unusual amount or timing';
+    if (score > 0.5) return 'Transaction shows minor anomalies';
+    return 'Low risk transaction';
+  };
+
+  const handleMarkSafe = async (id: string) => {
+    try {
+      await transactionsAPI.update(id, { status: 'normal' });
+      setAlerts(
+        alerts.map((alert) =>
+          alert.id === id ? { ...alert, status: "acknowledged" } : alert
+        )
+      );
+      toast.success("Transaction marked as safe");
+    } catch (error: any) {
+      console.error('Failed to mark safe:', error);
+      toast.error('Failed to update transaction');
+    }
+  };
+
+  const handleReportFraud = async (id: string) => {
+    try {
+      await transactionsAPI.delete(id);
+      setAlerts(alerts.filter((alert) => alert.id !== id));
+      toast.success("Fraud reported and transaction removed");
+    } catch (error: any) {
+      console.error('Failed to report fraud:', error);
+      toast.error('Failed to remove transaction');
+    }
   };
 
   const pendingAlerts = alerts.filter((a) => a.status === "pending");
   const acknowledgedAlerts = alerts.filter((a) => a.status === "acknowledged");
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading alerts...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-7xl">

@@ -4,7 +4,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Send, Bot, User, Loader2, TrendingUp } from "lucide-react";
 import { ScrollArea } from "../components/ui/scroll-area";
-import { transactionAPI, insightsAPI } from "../../utils/api/transactions";
+import { transactionsAPI, aiAPI } from "../../services/api";
 
 interface Message {
   id: string;
@@ -47,8 +47,8 @@ export default function Chatbot() {
     try {
       // Get user's financial data
       const [txResponse, insightsResponse] = await Promise.all([
-        transactionAPI.getAll(),
-        insightsAPI.get(),
+        transactionsAPI.getAll(),
+        aiAPI.getInsights(),
       ]);
 
       const transactions = txResponse.transactions || [];

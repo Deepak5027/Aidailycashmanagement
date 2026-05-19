@@ -61,8 +61,32 @@ export default function Dashboard() {
         aiAPI.getInsights().catch(() => ({ insights: [] })),
       ]);
 
-      setTransactions(txResponse.transactions || []);
-      setBudgets(budgetResponse.budgets || []);
+      const transactions = txResponse.transactions || [];
+      const budgetsData = budgetResponse.budgets || [];
+
+      // Calculate spent and predicted for each budget
+      const budgetsWithCalculations = budgetsData.map((budget: any) => {
+        const categoryTransactions = transactions.filter(
+          (t: any) => t.type === 'expense' && t.category === budget.category
+        );
+
+        const spent = categoryTransactions.reduce((sum: number, t: any) => sum + t.amount, 0);
+
+        // Simple prediction: average daily spending * days remaining in month
+        const daysInMonth = 30;
+        const daysPassed = new Date().getDate();
+        const avgDailySpending = spent / daysPassed;
+        const predicted = avgDailySpending * daysInMonth;
+
+        return {
+          ...budget,
+          spent: Math.round(spent * 100) / 100,
+          predicted: Math.round(predicted * 100) / 100,
+        };
+      });
+
+      setTransactions(transactions);
+      setBudgets(budgetsWithCalculations);
       setInsights(insightsResponse.insights || []);
     } catch (error: any) {
       console.error('Failed to load dashboard data:', error);
