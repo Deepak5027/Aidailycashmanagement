@@ -1,3 +1,4 @@
+import { supabase } from "../../utils/supabase/client";
 import { useState, useRef } from "react";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -10,11 +11,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { Camera, Upload, CheckCircle, Loader2, ScanLine, X, Image as ImageIcon } from "lucide-react";
+import {
+  Camera,
+  Upload,
+  CheckCircle,
+  Loader2,
+  ScanLine,
+  X,
+  Image as ImageIcon,
+} from "lucide-react";
 import { categories } from "../data/mockData";
 import { toast } from "sonner";
 import { createWorker } from "tesseract.js";
-import { transactionsAPI, receiptsAPI, aiAPI } from "../../services/api";
+import {
+  transactionsAPI,
+  receiptsAPI,
+  aiAPI,
+} from "../../services/api";
 
 export default function Scanner() {
   const [isScanning, setIsScanning] = useState(false);
@@ -24,21 +37,25 @@ export default function Scanner() {
     date: string;
     category: string;
   } | null>(null);
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedImage, setUploadedImage] = useState<
+    string | null
+  >(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = event.target.files?.[0];
     if (file) {
       // Validate file type
-      if (!file.type.startsWith('image/')) {
-        toast.error('Please upload an image file');
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please upload an image file");
         return;
       }
 
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        toast.error('Image size must be less than 5MB');
+        toast.error("Image size must be less than 5MB");
         return;
       }
 
@@ -59,14 +76,16 @@ export default function Scanner() {
 
   const processReceiptImage = async (imageData: string) => {
     setIsScanning(true);
-    toast.info('Processing receipt with OCR...');
+    toast.info("Processing receipt with OCR...");
 
     try {
       // Initialize Tesseract.js worker
-      const worker = await createWorker('eng');
+      const worker = await createWorker("eng");
 
       // Perform OCR on the uploaded image
-      const { data: { text } } = await worker.recognize(imageData);
+      const {
+        data: { text },
+      } = await worker.recognize(imageData);
       await worker.terminate();
 
       // Extract information using AI/pattern matching
@@ -76,20 +95,28 @@ export default function Scanner() {
       setIsScanning(false);
       toast.success("Receipt scanned successfully!");
     } catch (error: any) {
-      console.error('OCR Error:', error);
-      toast.error('Failed to process receipt. Please try again.');
+      console.error("OCR Error:", error);
+      toast.error(
+        "Failed to process receipt. Please try again.",
+      );
       setIsScanning(false);
     }
   };
 
   const extractReceiptData = (text: string) => {
     // Extract amount (look for currency patterns)
-    const amountMatch = text.match(/(?:total|amount|sum)[\s:]*\$?(\d+\.?\d*)/i);
+    const amountMatch = text.match(
+      /(?:total|amount|sum)[\s:]*\$?(\d+\.?\d*)/i,
+    );
     const amount = amountMatch ? amountMatch[1] : "0.00";
 
     // Extract date (look for date patterns)
-    const dateMatch = text.match(/(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/);
-    const extractedDate = dateMatch ? dateMatch[1] : new Date().toISOString().split("T")[0];
+    const dateMatch = text.match(
+      /(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/,
+    );
+    const extractedDate = dateMatch
+      ? dateMatch[1]
+      : new Date().toISOString().split("T")[0];
 
     // Convert date to ISO format if needed
     let date = new Date().toISOString().split("T")[0];
@@ -105,7 +132,9 @@ export default function Scanner() {
     }
 
     // Extract merchant name (usually first line or before address)
-    const lines = text.split('\n').filter(line => line.trim().length > 0);
+    const lines = text
+      .split("\n")
+      .filter((line) => line.trim().length > 0);
     const merchant = lines[0]?.trim() || "Unknown Merchant";
 
     // Auto-detect category based on merchant keywords
@@ -119,27 +148,92 @@ export default function Scanner() {
     };
   };
 
-  const detectCategory = (merchant: string, fullText: string) => {
-    const lowerText = (merchant + ' ' + fullText).toLowerCase();
+  const detectCategory = (
+    merchant: string,
+    fullText: string,
+  ) => {
+    const lowerText = (merchant + " " + fullText).toLowerCase();
 
     // Category detection keywords
     const categoryKeywords: Record<string, string[]> = {
-      groceries: ['grocery', 'supermarket', 'whole foods', 'trader joe', 'safeway', 'kroger', 'walmart', 'market'],
-      fuel: ['gas', 'shell', 'chevron', 'exxon', 'bp', 'mobil', 'fuel', 'petrol'],
-      healthcare: ['pharmacy', 'cvs', 'walgreens', 'hospital', 'medical', 'doctor', 'clinic', 'health'],
-      food: ['restaurant', 'cafe', 'pizza', 'burger', 'doordash', 'uber eats', 'grubhub', 'food', 'dining'],
-      shopping: ['target', 'walmart', 'amazon', 'mall', 'store', 'retail'],
-      bills: ['electric', 'water', 'internet', 'utility', 'bill', 'subscription'],
-      travel: ['uber', 'lyft', 'taxi', 'airline', 'hotel', 'airbnb'],
+      groceries: [
+        "grocery",
+        "supermarket",
+        "whole foods",
+        "trader joe",
+        "safeway",
+        "kroger",
+        "walmart",
+        "market",
+      ],
+      fuel: [
+        "gas",
+        "shell",
+        "chevron",
+        "exxon",
+        "bp",
+        "mobil",
+        "fuel",
+        "petrol",
+      ],
+      healthcare: [
+        "pharmacy",
+        "cvs",
+        "walgreens",
+        "hospital",
+        "medical",
+        "doctor",
+        "clinic",
+        "health",
+      ],
+      food: [
+        "restaurant",
+        "cafe",
+        "pizza",
+        "burger",
+        "doordash",
+        "uber eats",
+        "grubhub",
+        "food",
+        "dining",
+      ],
+      shopping: [
+        "target",
+        "walmart",
+        "amazon",
+        "mall",
+        "store",
+        "retail",
+      ],
+      bills: [
+        "electric",
+        "water",
+        "internet",
+        "utility",
+        "bill",
+        "subscription",
+      ],
+      travel: [
+        "uber",
+        "lyft",
+        "taxi",
+        "airline",
+        "hotel",
+        "airbnb",
+      ],
     };
 
-    for (const [category, keywords] of Object.entries(categoryKeywords)) {
-      if (keywords.some(keyword => lowerText.includes(keyword))) {
+    for (const [category, keywords] of Object.entries(
+      categoryKeywords,
+    )) {
+      if (
+        keywords.some((keyword) => lowerText.includes(keyword))
+      ) {
         return category;
       }
     }
 
-    return 'shopping'; // Default category
+    return "shopping"; // Default category
   };
 
   const handleScan = () => {
@@ -155,20 +249,40 @@ export default function Scanner() {
         amount: parseFloat(scannedData.amount),
         category: scannedData.category,
         date: new Date(scannedData.date).toISOString(),
-        type: 'expense',
-        payment_mode: 'Credit Card',
+        type: "expense",
+        payment_mode: "Credit Card",
       };
 
       // Analyze fraud risk
-      const fraudAnalysis = await aiAPI.analyzeFraud(transactionData);
+      const fraudAnalysis =
+        await aiAPI.analyzeFraud(transactionData);
 
       // Save transaction
-      const txResponse = await transactionsAPI.create({
-        ...transactionData,
-        risk_score: fraudAnalysis.risk_score,
-        status: fraudAnalysis.status,
-        notes: 'Added from receipt scanner',
-      });
+      // Save transaction directly to Supabase
+      const { data: txResponse, error: txError } =
+        await supabase
+          .from("transactions")
+          .insert({
+            user_id: (await supabase.auth.getUser()).data.user
+              ?.id,
+            merchant: scannedData.merchant,
+            amount: Number(scannedData.amount),
+            category: scannedData.category,
+            date: new Date(scannedData.date).toISOString(),
+            type: "expense",
+            payment_mode: "Credit Card",
+            risk_score: fraudAnalysis.risk_score,
+            status: fraudAnalysis.status,
+            notes: "Added from receipt scanner",
+          })
+          .select()
+          .single();
+
+      if (txError) {
+        console.error(txError);
+        toast.error(txError.message);
+        return;
+      }
 
       // Save receipt data
       await receiptsAPI.save({
@@ -180,12 +294,14 @@ export default function Scanner() {
         ocr_text: `Merchant: ${scannedData.merchant}\nAmount: $${scannedData.amount}\nDate: ${scannedData.date}`,
       });
 
-      toast.success("Transaction and receipt saved successfully!");
+      toast.success(
+        "Transaction and receipt saved successfully!",
+      );
       setScannedData(null);
       setUploadedImage(null);
     } catch (error: any) {
-      toast.error('Failed to save transaction');
-      console.error('Save error:', error);
+      toast.error("Failed to save transaction");
+      console.error("Save error:", error);
     }
   };
 
@@ -194,7 +310,7 @@ export default function Scanner() {
     setUploadedImage(null);
     setIsScanning(false);
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
@@ -211,9 +327,12 @@ export default function Scanner() {
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold">Receipt Scanner</h1>
+        <h1 className="text-2xl lg:text-3xl font-bold">
+          Receipt Scanner
+        </h1>
         <p className="text-gray-600 mt-1">
-          Use OCR to automatically extract transaction details from receipts
+          Use OCR to automatically extract transaction details
+          from receipts
         </p>
       </div>
 
@@ -224,12 +343,25 @@ export default function Scanner() {
             <ScanLine className="w-6 h-6 text-blue-600" />
           </div>
           <div>
-            <h3 className="font-bold mb-2">How Receipt Scanning Works</h3>
+            <h3 className="font-bold mb-2">
+              How Receipt Scanning Works
+            </h3>
             <ul className="text-sm text-blue-900 space-y-1">
-              <li>• Upload or capture a photo of your receipt</li>
-              <li>• AI extracts merchant name, amount, date, and items using OCR</li>
-              <li>• Machine learning automatically categorizes the transaction</li>
-              <li>• Review and confirm before saving to your transaction history</li>
+              <li>
+                • Upload or capture a photo of your receipt
+              </li>
+              <li>
+                • AI extracts merchant name, amount, date, and
+                items using OCR
+              </li>
+              <li>
+                • Machine learning automatically categorizes the
+                transaction
+              </li>
+              <li>
+                • Review and confirm before saving to your
+                transaction history
+              </li>
             </ul>
           </div>
         </div>
@@ -251,7 +383,9 @@ export default function Scanner() {
                 </div>
                 <div>
                   <h3 className="font-bold text-lg mb-2">
-                    {isScanning ? "Processing Receipt..." : "Upload Receipt Image"}
+                    {isScanning
+                      ? "Processing Receipt..."
+                      : "Upload Receipt Image"}
                   </h3>
                   <p className="text-gray-600 mb-4">
                     Drag and drop or click to browse
@@ -263,7 +397,10 @@ export default function Scanner() {
                       <Upload className="w-4 h-4 mr-2" />
                       Choose File
                     </Button>
-                    <Button variant="outline" onClick={handleScan}>
+                    <Button
+                      variant="outline"
+                      onClick={handleScan}
+                    >
                       <Camera className="w-4 h-4 mr-2" />
                       Take Photo
                     </Button>
@@ -278,9 +415,12 @@ export default function Scanner() {
                 <div className="flex items-center gap-3">
                   <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
                   <div className="text-sm">
-                    <p className="font-medium text-blue-900">Processing with OCR...</p>
+                    <p className="font-medium text-blue-900">
+                      Processing with OCR...
+                    </p>
                     <p className="text-blue-700">
-                      Extracting merchant, amount, date, and line items
+                      Extracting merchant, amount, date, and
+                      line items
                     </p>
                   </div>
                 </div>
@@ -293,7 +433,9 @@ export default function Scanner() {
                 <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                   <CheckCircle className="w-6 h-6 text-green-600" />
                 </div>
-                <h4 className="font-medium mb-1">Accurate OCR</h4>
+                <h4 className="font-medium mb-1">
+                  Accurate OCR
+                </h4>
                 <p className="text-sm text-gray-600">
                   High accuracy text extraction from receipts
                 </p>
@@ -302,7 +444,9 @@ export default function Scanner() {
                 <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
                   <ScanLine className="w-6 h-6 text-purple-600" />
                 </div>
-                <h4 className="font-medium mb-1">Smart Detection</h4>
+                <h4 className="font-medium mb-1">
+                  Smart Detection
+                </h4>
                 <p className="text-sm text-gray-600">
                   AI identifies key fields automatically
                 </p>
@@ -311,7 +455,9 @@ export default function Scanner() {
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
                   <CheckCircle className="w-6 h-6 text-blue-600" />
                 </div>
-                <h4 className="font-medium mb-1">Auto Category</h4>
+                <h4 className="font-medium mb-1">
+                  Auto Category
+                </h4>
                 <p className="text-sm text-gray-600">
                   Transactions categorized automatically
                 </p>
@@ -328,7 +474,9 @@ export default function Scanner() {
                 <CheckCircle className="w-6 h-6 text-green-600" />
               </div>
               <div>
-                <h3 className="font-bold text-lg">Receipt Scanned Successfully!</h3>
+                <h3 className="font-bold text-lg">
+                  Receipt Scanned Successfully!
+                </h3>
                 <p className="text-sm text-gray-600">
                   Review and confirm the extracted information
                 </p>
@@ -343,7 +491,10 @@ export default function Scanner() {
                   id="merchant"
                   value={scannedData.merchant}
                   onChange={(e) =>
-                    setScannedData({ ...scannedData, merchant: e.target.value })
+                    setScannedData({
+                      ...scannedData,
+                      merchant: e.target.value,
+                    })
                   }
                 />
               </div>
@@ -355,7 +506,10 @@ export default function Scanner() {
                     type="number"
                     value={scannedData.amount}
                     onChange={(e) =>
-                      setScannedData({ ...scannedData, amount: e.target.value })
+                      setScannedData({
+                        ...scannedData,
+                        amount: e.target.value,
+                      })
                     }
                   />
                 </div>
@@ -366,17 +520,25 @@ export default function Scanner() {
                     type="date"
                     value={scannedData.date}
                     onChange={(e) =>
-                      setScannedData({ ...scannedData, date: e.target.value })
+                      setScannedData({
+                        ...scannedData,
+                        date: e.target.value,
+                      })
                     }
                   />
                 </div>
               </div>
               <div>
-                <Label htmlFor="category">Category (AI Detected)</Label>
+                <Label htmlFor="category">
+                  Category (AI Detected)
+                </Label>
                 <Select
                   value={scannedData.category}
                   onValueChange={(value) =>
-                    setScannedData({ ...scannedData, category: value })
+                    setScannedData({
+                      ...scannedData,
+                      category: value,
+                    })
                   }
                 >
                   <SelectTrigger id="category">
@@ -402,8 +564,8 @@ export default function Scanner() {
                     AI Confidence: 95% - Highly Accurate
                   </p>
                   <p className="text-green-700 mt-1">
-                    All fields extracted successfully. Category auto-detected based on merchant
-                    name.
+                    All fields extracted successfully. Category
+                    auto-detected based on merchant name.
                   </p>
                 </div>
               </div>
@@ -429,7 +591,9 @@ export default function Scanner() {
 
       {/* Tips Card */}
       <Card className="p-6">
-        <h3 className="font-bold mb-4">Tips for Best Results</h3>
+        <h3 className="font-bold mb-4">
+          Tips for Best Results
+        </h3>
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <h4 className="font-medium text-sm">✓ Do:</h4>
