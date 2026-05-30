@@ -42,6 +42,7 @@ import {
   DollarSign,
   ShoppingBag,
   Download,
+  BarChart3 as BarChartIcon,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { transactionsAPI } from "../../services/api";
@@ -361,7 +362,7 @@ export default function Analytics() {
               </p>
             </div>
             <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-              <BarChart className="w-6 h-6 text-purple-600" />
+              <BarChartIcon className="w-6 h-6 text-purple-600" />
             </div>
           </div>
         </Card>
@@ -385,8 +386,8 @@ export default function Analytics() {
               <h3 className="font-bold text-lg mb-4">
                 Monthly Spending Trend
               </h3>
-              <ResponsiveContainer width="100%" height={300} key="monthly-area-chart">
-                <AreaChart data={monthlyData} id="monthly-spending-area">
+              <ResponsiveContainer width="100%" height={300} key="analytics-monthly-area">
+                <AreaChart data={monthlyData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
@@ -410,7 +411,7 @@ export default function Analytics() {
                 Spending Distribution
               </h3>
               <ResponsiveContainer width="100%" height={300} key="analytics-pie-overview">
-                <PieChart id="analytics-category-pie">
+                <PieChart>
                   <Pie
                     data={categorySpending}
                     cx="50%"
@@ -423,11 +424,10 @@ export default function Analytics() {
                     fill="#8884d8"
                     dataKey="value"
                     nameKey="category"
-                    id="pie-analytics-category"
                   >
                     {categorySpending.map((entry, index) => (
                       <Cell
-                        key={`cell-analytics-${entry.category}-${index}`}
+                        key={`analytics-overview-cell-${index}`}
                         fill={COLORS[index % COLORS.length]}
                       />
                     ))}
@@ -444,11 +444,10 @@ export default function Analytics() {
             <h3 className="font-bold text-lg mb-4">
               Spending by Category
             </h3>
-            <ResponsiveContainer width="100%" height={400} key="category-bar-chart">
+            <ResponsiveContainer width="100%" height={400} key="analytics-category-bar">
               <BarChart
                 data={categorySpending}
                 layout="vertical"
-                id="category-bar-chart"
               >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" />
@@ -458,7 +457,7 @@ export default function Analytics() {
                   width={100}
                 />
                 <Tooltip />
-                <Bar dataKey="value" fill="#3b82f6" id="bar-category-value" />
+                <Bar dataKey="value" fill="#3b82f6" />
               </BarChart>
             </ResponsiveContainer>
           </Card>
@@ -513,8 +512,8 @@ export default function Analytics() {
             <h3 className="font-bold text-lg mb-4">
               6-Month Spending History
             </h3>
-            <ResponsiveContainer width="100%" height={400} key="trends-line-chart">
-              <LineChart data={monthlyData} id="trends-spending-line">
+            <ResponsiveContainer width="100%" height={400} key="analytics-trends-line">
+              <LineChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
@@ -526,7 +525,6 @@ export default function Analytics() {
                   stroke="#3b82f6"
                   strokeWidth={3}
                   name="Spending"
-                  id="line-trends-spending"
                 />
               </LineChart>
             </ResponsiveContainer>
