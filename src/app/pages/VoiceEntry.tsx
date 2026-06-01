@@ -1,15 +1,25 @@
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Mic, MicOff, Volume2, CheckCircle, Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { toast } from "sonner";
 import { categories } from "../data/mockData";
 import { transactionsAPI, aiAPI } from "../../services/api";
 
+const languageMap: Record<string, string> = {
+  en: 'en-US',
+  ta: 'ta-IN',
+  hi: 'hi-IN'
+};
+
 export default function VoiceEntry() {
+  const { t, i18n } = useTranslation();
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const [selectedLang, setSelectedLang] = useState('en-US');
   const [parsedData, setParsedData] = useState<{
     merchant: string;
     amount: number;
@@ -18,21 +28,32 @@ export default function VoiceEntry() {
   } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [browserSupported, setBrowserSupported] = useState(true);
+  const [permissionStatus, setPermissionStatus] = useState<'granted' | 'denied' | 'prompt' | 'checking'>('checking');
   const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    // Set language based on i18n
+    const lang = languageMap[i18n.language] || 'en-US';
+    setSelectedLang(lang);
+  }, [i18n.language]);
 
   useEffect(() => {
     // Check if browser supports Web Speech API
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setBrowserSupported(false);
+      setPermissionStatus('denied');
       return;
     }
+
+    // Check microphone permission
+    checkMicrophonePermission();
 
     // Initialize speech recognition
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.lang = 'en-US';
+    recognition.lang = selectedLang;
 
     recognition.onresult = (event: any) => {
       const speechResult = event.results[0][0].transcript;
@@ -53,7 +74,17 @@ export default function VoiceEntry() {
       console.error('Speech recognition error:', event.error);
       setIsListening(false);
       setIsProcessing(false);
-      toast.error(`Voice recognition error: ${event.error}`);
+
+      if (event.error === 'not-allowed') {
+        setPermissionStatus('denied');
+        toast.error('Microphone access denied. Please enable microphone permissions in your browser settings.');
+      } else if (event.error === 'no-speech') {
+        toast.error('No speech detected. Please try again.');
+      } else if (event.error === 'network') {
+        toast.error('Network error. Please check your connection.');
+      } else {
+        toast.error(`Voice recognition error: ${event.error}`);
+      }
     };
 
     recognition.onend = () => {
@@ -67,20 +98,66 @@ export default function VoiceEntry() {
         recognitionRef.current.stop();
       }
     };
-  }, []);
+  }, [selectedLang]);
 
-  const handleVoiceInput = () => {
+  const checkMicrophonePermission = async () => {
+    try {
+      // Try to get microphone permission
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Stop all tracks immediately
+      stream.getTracks().forEach(track => track.stop());
+      setPermissionStatus('granted');
+    } catch (error: any) {
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        setPermissionStatus('denied');
+      } else if (error.name === 'NotFoundError') {
+        setPermissionStatus('denied');
+        toast.error('No microphone found on your device');
+      } else {
+        setPermissionStatus('prompt');
+      }
+    }
+  };
+
+  const requestMicrophonePermission = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop());
+      setPermissionStatus('granted');
+      toast.success('Microphone access granted!');
+    } catch (error: any) {
+      setPermissionStatus('denied');
+      if (error.name === 'NotAllowedError') {
+        toast.error('Microphone permission denied. Please check your browser settings.');
+      } else {
+        toast.error('Failed to access microphone');
+      }
+    }
+  };
+
+  const handleVoiceInput = async () => {
     if (!browserSupported) {
       toast.error('Your browser does not support voice recognition');
       return;
     }
 
+    if (permissionStatus === 'denied' || permissionStatus === 'prompt') {
+      await requestMicrophonePermission();
+      return;
+    }
+
     if (!isListening) {
-      setIsListening(true);
-      setTranscript("");
-      setParsedData(null);
-      recognitionRef.current?.start();
-      toast.info('Listening... Speak now!');
+      try {
+        setIsListening(true);
+        setTranscript("");
+        setParsedData(null);
+        recognitionRef.current?.start();
+        toast.info('Listening... Speak now!');
+      } catch (error) {
+        console.error('Failed to start recognition:', error);
+        setIsListening(false);
+        toast.error('Failed to start voice recognition');
+      }
     } else {
       recognitionRef.current?.stop();
       setIsListening(false);
@@ -153,10 +230,63 @@ export default function VoiceEntry() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl lg:text-3xl font-bold">Voice Entry</h1>
-        <p className="text-gray-600 mt-1">Add transactions using voice commands</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-bold">{t('voiceEntry')}</h1>
+          <p className="text-gray-600 mt-1">Add transactions using voice commands</p>
+        </div>
+        <div className="w-48">
+          <Select value={selectedLang} onValueChange={setSelectedLang}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="en-US">English (US)</SelectItem>
+              <SelectItem value="ta-IN">தமிழ் (Tamil)</SelectItem>
+              <SelectItem value="hi-IN">हिन्दी (Hindi)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
+
+      {/* Permission Warning */}
+      {!browserSupported && (
+        <Card className="p-4 bg-red-50 border-red-200">
+          <div className="flex items-center gap-3">
+            <MicOff className="w-5 h-5 text-red-600" />
+            <div>
+              <p className="font-medium text-red-900">Browser Not Supported</p>
+              <p className="text-sm text-red-700 mt-1">
+                Your browser doesn't support voice recognition. Please use Chrome, Edge, or Safari.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {permissionStatus === 'denied' && browserSupported && (
+        <Card className="p-4 bg-yellow-50 border-yellow-200">
+          <div className="flex items-start gap-3">
+            <MicOff className="w-5 h-5 text-yellow-600 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-medium text-yellow-900">Microphone Permission Required</p>
+              <p className="text-sm text-yellow-700 mt-1">
+                Please allow microphone access to use voice entry. Click the button below to grant permission.
+              </p>
+              <Button
+                onClick={requestMicrophonePermission}
+                className="mt-3"
+                size="sm"
+              >
+                Grant Microphone Access
+              </Button>
+              <p className="text-xs text-yellow-600 mt-2">
+                💡 If the button doesn't work, check your browser's address bar for a blocked microphone icon and click it to enable.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Voice Input Card */}
       <Card className="p-8">
@@ -166,9 +296,12 @@ export default function VoiceEntry() {
             <Button
               size="lg"
               onClick={handleVoiceInput}
+              disabled={!browserSupported}
               className={`w-32 h-32 rounded-full ${
                 isListening
                   ? "bg-red-500 hover:bg-red-600 animate-pulse"
+                  : permissionStatus === 'denied' || permissionStatus === 'prompt'
+                  ? "bg-yellow-500 hover:bg-yellow-600"
                   : "bg-gradient-to-br from-blue-600 to-purple-600"
               }`}
             >
@@ -186,14 +319,22 @@ export default function VoiceEntry() {
           {/* Status */}
           <div className="text-center">
             <h3 className="text-xl font-bold mb-2">
-              {isListening
+              {!browserSupported
+                ? "Browser Not Supported"
+                : permissionStatus === 'denied' || permissionStatus === 'prompt'
+                ? "Microphone Permission Needed"
+                : isListening
                 ? "Listening..."
                 : isProcessing
                 ? "Processing..."
                 : "Tap to speak"}
             </h3>
             <p className="text-gray-600">
-              {isListening
+              {!browserSupported
+                ? "Please use Chrome, Edge, or Safari"
+                : permissionStatus === 'denied' || permissionStatus === 'prompt'
+                ? "Click the microphone button to grant permission"
+                : isListening
                 ? "Say your transaction details naturally"
                 : isProcessing
                 ? "AI is analyzing your speech"

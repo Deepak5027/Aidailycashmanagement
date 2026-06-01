@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../utils/supabase/client';
 
 // Helper to get current user ID
 async function getUserId(): Promise<string> {

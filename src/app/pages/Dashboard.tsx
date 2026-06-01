@@ -47,6 +47,8 @@ import { Link } from "react-router";
 import { transactionsAPI, budgetsAPI, aiAPI } from "../../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useRole } from "../contexts/RoleContext";
+import { useLanguage } from "../../contexts/LanguageContext";
+import { LanguageSelector } from "../components/LanguageSelector";
 
 // ─── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -1012,6 +1014,7 @@ function FreelancerDashboard({ user, onReset }: { user: any; onReset: () => void
 export default function Dashboard() {
   const { user } = useAuth();
   const { role, setRole, clearRole } = useRole();
+  const { changeLanguage, languagePreferenceSet } = useLanguage();
 
   const handleSelect = (r: string) => {
     setRole(r as any);
@@ -1021,10 +1024,21 @@ export default function Dashboard() {
     clearRole();
   };
 
+  const handleLanguageSelect = async (lang: string) => {
+    await changeLanguage(lang);
+  };
+
+  // Step 1: Select Role
   if (!role) {
     return <RoleSelector onSelect={handleSelect} />;
   }
 
+  // Step 2: Select Language (only if not set yet)
+  if (!languagePreferenceSet) {
+    return <LanguageSelector onSelect={handleLanguageSelect} />;
+  }
+
+  // Step 3: Show Dashboard
   const props = { user, onReset: handleReset };
 
   switch (role) {

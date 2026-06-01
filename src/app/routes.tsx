@@ -15,6 +15,8 @@ import SmartInsights from "./pages/SmartInsights";
 import Goals from "./pages/Goals";
 import Chatbot from "./pages/Chatbot";
 import BankImport from "./pages/BankImport";
+import Calculator from "./pages/Calculator";
+import AIPredictions from "./pages/AIPredictions";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 export const router = createBrowserRouter([
@@ -45,6 +47,8 @@ export const router = createBrowserRouter([
       { path: "goals", element: <Goals /> },
       { path: "chatbot", element: <Chatbot /> },
       { path: "import", element: <BankImport /> },
+      { path: "calculator", element: <Calculator /> },
+      { path: "predictions", element: <AIPredictions /> },
       { path: "profile", element: <Profile /> },
     ],
   },

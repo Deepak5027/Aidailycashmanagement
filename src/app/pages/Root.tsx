@@ -18,10 +18,15 @@ import {
   Search,
   Sparkles,
   ChevronDown,
+  Calculator as CalcIcon,
+  TrendingUp,
+  WifiOff,
+  Clock,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { RoleProvider } from "../contexts/RoleContext";
+import { LanguageSwitcher } from "../components/LanguageSwitcher";
 
 const navGroups = [
   {
@@ -37,6 +42,7 @@ const navGroups = [
       { name: "Transactions", path: "/app/transactions", icon: Receipt },
       { name: "Budget", path: "/app/budget", icon: Wallet },
       { name: "Goals", path: "/app/goals", icon: Target },
+      { name: "Calculator", path: "/app/calculator", icon: CalcIcon },
     ],
   },
   {
@@ -45,6 +51,7 @@ const navGroups = [
       { name: "Voice Entry", path: "/app/voice", icon: Mic },
       { name: "Receipt Scanner", path: "/app/scanner", icon: ScanLine },
       { name: "AI Insights", path: "/app/insights", icon: Brain },
+      { name: "AI Predictions", path: "/app/predictions", icon: TrendingUp },
       { name: "AI Chatbot", path: "/app/chatbot", icon: Bot },
     ],
   },
@@ -66,7 +73,31 @@ const navGroups = [
 export default function Root() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [lastSync, setLastSync] = useState<string>('');
   const { user } = useAuth();
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Update last sync time
+    setLastSync(new Date().toLocaleTimeString());
+    const interval = setInterval(() => {
+      if (isOnline) {
+        setLastSync(new Date().toLocaleTimeString());
+      }
+    }, 60000);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      clearInterval(interval);
+    };
+  }, [isOnline]);
 
   const isActive = (path: string) =>
     location.pathname === path || (path === "/app" && location.pathname === "/app");
@@ -280,6 +311,19 @@ export default function Root() {
               <span className="text-sm" style={{ color: "#3d4f6b" }}>Search anything...</span>
             </div>
             <div className="flex items-center gap-3">
+              {!isOnline && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>
+                  <WifiOff className="w-3 h-3" />
+                  Offline
+                </div>
+              )}
+              {isOnline && lastSync && (
+                <div className="flex items-center gap-1.5 text-xs" style={{ color: "#6b7ca0" }}>
+                  <Clock className="w-3 h-3" />
+                  {lastSync}
+                </div>
+              )}
+              <LanguageSwitcher />
               <button
                 className="w-9 h-9 rounded-xl flex items-center justify-center relative transition-colors"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
