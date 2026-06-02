@@ -413,7 +413,7 @@ export default function Analytics() {
               <ResponsiveContainer width="100%" height={300} key="analytics-pie-overview">
                 <PieChart>
                   <Pie
-                    data={categorySpending}
+                    data={categorySpending.map((item, idx) => ({ ...item, id: `pie-${idx}` }))}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
@@ -427,7 +427,7 @@ export default function Analytics() {
                   >
                     {categorySpending.map((entry, index) => (
                       <Cell
-                        key={`analytics-overview-cell-${index}`}
+                        key={`analytics-overview-cell-${entry.category}-${index}`}
                         fill={COLORS[index % COLORS.length]}
                       />
                     ))}
@@ -446,7 +446,7 @@ export default function Analytics() {
             </h3>
             <ResponsiveContainer width="100%" height={400} key="analytics-category-bar">
               <BarChart
-                data={categorySpending}
+                data={categorySpending.map((item, idx) => ({ ...item, id: `bar-cat-${idx}` }))}
                 layout="vertical"
               >
                 <CartesianGrid strokeDasharray="3 3" />
@@ -513,7 +513,7 @@ export default function Analytics() {
               6-Month Spending History
             </h3>
             <ResponsiveContainer width="100%" height={400} key="analytics-trends-line">
-              <LineChart data={monthlyData}>
+              <LineChart data={monthlyData.map((item, idx) => ({ ...item, id: `month-trend-${idx}` }))}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />

@@ -186,7 +186,7 @@ export default function AIPredictions() {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={predictions.cashFlowForecast}>
+            <LineChart data={predictions.cashFlowForecast.map((item, idx) => ({ ...item, id: idx }))}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
               <YAxis />
@@ -216,8 +216,9 @@ export default function AIPredictions() {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={predictions.cashFlowForecast.map(item => ({
+            <BarChart data={predictions.cashFlowForecast.map((item, idx) => ({
               ...item,
+              id: `forecast-${idx}`,
               expense: predictions.nextMonthExpense,
               income: predictions.nextMonthExpense + item.amount
             }))}>
