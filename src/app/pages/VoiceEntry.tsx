@@ -165,30 +165,113 @@ export default function VoiceEntry() {
   };
 
   const parseVoiceInput = (text: string): any => {
-    // Simulate AI/NLP parsing
-    const amountMatch = text.match(/(\d+\.?\d*)\s*dollars?/i);
-    const amount = amountMatch ? parseFloat(amountMatch[1]) : 0;
+    const lowerText = text.toLowerCase();
 
+    // Extract amount - support multiple formats
+    let amount = 0;
+    let amountMatch = null;
+
+    // Try various amount patterns
+    const patterns = [
+      /(?:rupees?|rs\.?|₹)\s*(\d+(?:\.\d+)?)/i,  // rupees 250, Rs. 250, ₹250
+      /(\d+(?:\.\d+)?)\s*(?:rupees?|rs\.?|₹)/i,  // 250 rupees, 250 Rs
+      /(?:dollars?|\$)\s*(\d+(?:\.\d+)?)/i,       // dollars 45, $45
+      /(\d+(?:\.\d+)?)\s*(?:dollars?|\$)/i,       // 45 dollars
+      /(\d+(?:\.\d+)?)\s*(?:रुपये|रुपया)/i,      // Hindi: 250 रुपये
+      /(?:रुपये|रुपया)\s*(\d+(?:\.\d+)?)/i,      // Hindi: रुपये 250
+      /(\d+(?:\.\d+)?)\s*(?:ரூபாய்)/i,           // Tamil: 250 ரூபாய்
+      /(?:spent|paid|cost|total|for)\s+(\d+(?:\.\d+)?)/i,  // spent 250, paid 250
+      /(\d+(?:\.\d+)?)/,                          // Just a number
+    ];
+
+    for (const pattern of patterns) {
+      amountMatch = text.match(pattern);
+      if (amountMatch && amountMatch[1]) {
+        amount = parseFloat(amountMatch[1]);
+        break;
+      }
+    }
+
+    // Extract merchant name using multiple patterns
     let merchant = "";
-    let category = "";
-    let confidence = 0.95;
+    let confidence = 0.85;
 
-    if (text.toLowerCase().includes("starbucks") || text.toLowerCase().includes("coffee")) {
-      merchant = "Starbucks";
-      category = "food";
-    } else if (text.toLowerCase().includes("whole foods") || text.toLowerCase().includes("groceries")) {
-      merchant = "Whole Foods";
-      category = "groceries";
-    } else if (text.toLowerCase().includes("shell") || text.toLowerCase().includes("gas")) {
-      merchant = "Shell Gas Station";
-      category = "fuel";
-    } else if (text.toLowerCase().includes("netflix")) {
-      merchant = "Netflix";
-      category = "entertainment";
-    } else {
-      merchant = "Unknown Merchant";
-      category = "shopping";
-      confidence = 0.65;
+    // Pattern 1: "at/on [merchant]"
+    let merchantMatch = text.match(/(?:at|on|from|to)\s+([A-Za-z][A-Za-z0-9\s&'-]{2,30})(?:\s+for|\s+on|\s+₹|\s+rs|\s+rupees|\s+dollars?|\s+\d|$)/i);
+    if (merchantMatch) {
+      merchant = merchantMatch[1].trim();
+      confidence = 0.9;
+    }
+
+    // Pattern 2: "[merchant] for/on"
+    if (!merchant) {
+      merchantMatch = text.match(/^([A-Za-z][A-Za-z0-9\s&'-]{2,30})(?:\s+for|\s+on|\s+₹|\s+rs|\s+rupees|\s+dollars?|\s+\d)/i);
+      if (merchantMatch) {
+        merchant = merchantMatch[1].trim();
+        confidence = 0.85;
+      }
+    }
+
+    // Pattern 3: "spent/paid [amount] at/on [merchant]"
+    if (!merchant) {
+      merchantMatch = text.match(/(?:spent|paid|cost)\s+(?:\d+|\$|₹|rs).*?(?:at|on|from|to)\s+([A-Za-z][A-Za-z0-9\s&'-]{2,30})/i);
+      if (merchantMatch) {
+        merchant = merchantMatch[1].trim();
+        confidence = 0.88;
+      }
+    }
+
+    // Pattern 4: Just extract capitalized words as potential merchant
+    if (!merchant) {
+      const words = text.split(/\s+/);
+      const capitalizedWords = words.filter(w => /^[A-Z][a-z]+/.test(w) && !['I', 'Spent', 'Paid', 'For', 'On', 'At', 'The', 'A', 'An'].includes(w));
+      if (capitalizedWords.length > 0) {
+        merchant = capitalizedWords.join(' ');
+        confidence = 0.7;
+      }
+    }
+
+    // If still no merchant, use a more generic extraction
+    if (!merchant) {
+      // Remove common words and numbers, take what remains
+      const cleaned = text
+        .replace(/\b(?:i|spent|paid|for|on|at|from|to|the|a|an|rupees?|rs|dollars?|₹|\$|\d+)\b/gi, '')
+        .trim();
+      if (cleaned.length > 2) {
+        merchant = cleaned.split(/\s+/).slice(0, 3).join(' ');
+        confidence = 0.65;
+      } else {
+        merchant = "Transaction";
+        confidence = 0.5;
+      }
+    }
+
+    // Capitalize merchant name properly
+    merchant = merchant
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+
+    // Auto-categorize based on keywords
+    let category = "other";
+
+    const categoryKeywords: Record<string, string[]> = {
+      food: ['restaurant', 'cafe', 'coffee', 'food', 'pizza', 'burger', 'dining', 'starbucks', 'mcdonald', 'domino', 'subway'],
+      groceries: ['grocery', 'supermarket', 'market', 'walmart', 'target', 'whole foods', 'safeway', 'kroger', 'மளிகை', 'किराना'],
+      transport: ['uber', 'lyft', 'taxi', 'cab', 'metro', 'bus', 'train', 'auto', 'ola', 'போக்குவரத்து', 'परिवहन'],
+      fuel: ['gas', 'petrol', 'fuel', 'shell', 'chevron', 'bp', 'station', 'எரிபொருள்', 'पेट्रोल'],
+      entertainment: ['netflix', 'spotify', 'prime', 'movie', 'cinema', 'theater', 'game', 'entertainment', 'பொழுதுபோக்கு', 'मनोरंजन'],
+      shopping: ['amazon', 'flipkart', 'shop', 'store', 'mall', 'shopping', 'buy', 'purchase', 'ஷாப்பிங்', 'शॉपिंग'],
+      bills: ['bill', 'electricity', 'water', 'internet', 'phone', 'utility', 'பில்', 'बिल'],
+      health: ['hospital', 'clinic', 'pharmacy', 'doctor', 'medical', 'health', 'cvs', 'walgreens', 'ஆரோக்கியம்', 'स्वास्थ्य'],
+      education: ['school', 'college', 'university', 'course', 'book', 'education', 'tuition', 'கல்வி', 'शिक्षा'],
+    };
+
+    for (const [cat, keywords] of Object.entries(categoryKeywords)) {
+      if (keywords.some(keyword => lowerText.includes(keyword))) {
+        category = cat;
+        break;
+      }
     }
 
     return { merchant, amount, category, confidence };
@@ -337,8 +420,8 @@ export default function VoiceEntry() {
                 : isListening
                 ? "Say your transaction details naturally"
                 : isProcessing
-                ? "AI is analyzing your speech"
-                : "Try: 'I spent 45 dollars at Starbucks for coffee'"}
+                ? "AI is extracting merchant and amount..."
+                : "Try: 'I spent 250 rupees at Starbucks' or 'Swiggy 450 rupees'"}
             </p>
           </div>
 
@@ -426,17 +509,19 @@ export default function VoiceEntry() {
             <ul className="text-sm text-gray-600 space-y-1">
               <li>• "I spent [amount] at [merchant]"</li>
               <li>• "Paid [amount] for [category]"</li>
-              <li>• "[merchant] [amount] dollars"</li>
-              <li>• "I bought [item] for [amount]"</li>
+              <li>• "[merchant] [amount] rupees"</li>
+              <li>• "[amount] rupees on [merchant]"</li>
+              <li>• Tamil/Hindi voice input supported</li>
             </ul>
           </div>
           <div className="space-y-3">
             <h4 className="font-medium">🤖 AI Features:</h4>
             <ul className="text-sm text-gray-600 space-y-1">
-              <li>• Natural language processing</li>
-              <li>• Automatic merchant recognition</li>
-              <li>• Smart category detection</li>
-              <li>• Context-aware parsing</li>
+              <li>• Multi-language support (EN/TA/HI)</li>
+              <li>• Smart merchant name extraction</li>
+              <li>• Auto category detection</li>
+              <li>• Multiple currency formats</li>
+              <li>• Flexible sentence patterns</li>
             </ul>
           </div>
         </div>
@@ -447,10 +532,12 @@ export default function VoiceEntry() {
         <h3 className="font-bold text-lg mb-4">Example Voice Commands</h3>
         <div className="grid gap-3">
           {[
-            "I spent 45 dollars at Starbucks for coffee",
-            "Paid 120 dollars for groceries at Whole Foods",
-            "Gas station Shell, 65 dollars",
-            "Netflix subscription 15.99",
+            "I spent 250 rupees at Starbucks",
+            "Paid 1200 for groceries at Big Bazaar",
+            "Swiggy food delivery 450 rupees",
+            "Uber ride 180 rupees",
+            "Amazon shopping 2500",
+            "Electricity bill 850 rupees",
           ].map((example, idx) => (
             <div key={idx} className="flex items-center gap-3 p-3 bg-white rounded-lg border">
               <Mic className="w-4 h-4 text-purple-600" />
