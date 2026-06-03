@@ -66,7 +66,15 @@ export default function Login() {
           </div>
 
           <div>
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <Link
+                to="/forgot-password"
+                className="text-xs text-blue-600 hover:underline"
+              >
+                Forgot Password?
+              </Link>
+            </div>
             <div className="relative mt-1">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input

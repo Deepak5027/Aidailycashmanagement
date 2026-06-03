@@ -3,6 +3,8 @@ import Root from "./pages/Root";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import ForgotPassword from "./pages/ForgotPassword";
+import EmailVerification from "./pages/EmailVerification";
 import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
 import Budget from "./pages/Budget";
@@ -31,6 +33,14 @@ export const router = createBrowserRouter([
   {
     path: "/signup",
     element: <Signup />,
+  },
+  {
+    path: "/forgot-password",
+    element: <ForgotPassword />,
+  },
+  {
+    path: "/verify-email",
+    element: <EmailVerification />,
   },
   {
     path: "/app",

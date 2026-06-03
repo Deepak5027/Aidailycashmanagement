@@ -37,6 +37,9 @@ export default function Signup() {
 
       if (!result.success) {
         toast.error(result.error || 'Signup failed');
+      } else if (result.requiresVerification) {
+        toast.success('Account created! Please verify your email.');
+        navigate('/verify-email', { state: { email } });
       } else {
         toast.success('Account created successfully!');
         navigate('/app');

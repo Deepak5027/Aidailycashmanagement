@@ -45,18 +45,23 @@ class AuthService {
     }
   }
 
-  async signup(email: string, password: string, name: string): Promise<{ success: boolean; error?: string }> {
+  async signup(email: string, password: string, name: string): Promise<{ success: boolean; error?: string; requiresVerification?: boolean }> {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: { name },
+          emailRedirectTo: `${window.location.origin}/verify-email`,
         },
       });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      if (data.user && !data.session) {
+        return { success: true, requiresVerification: true };
       }
 
       return await this.login(email, password);
@@ -108,6 +113,105 @@ class AuthService {
       this.notifyListeners();
     } catch (error) {
       console.error('Logout error:', error);
+    }
+  }
+
+  async sendPasswordResetEmail(email: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Failed to send reset email' };
+    }
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Failed to reset password' };
+    }
+  }
+
+  async verifyOTP(email: string, token: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'recovery',
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Failed to verify OTP' };
+    }
+  }
+
+  async verifySignupOTP(email: string, token: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'signup',
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (data.session) {
+        this.state = {
+          user: {
+            id: data.user.id,
+            email: data.user.email || '',
+            name: data.user.user_metadata?.name || '',
+          },
+          accessToken: data.session.access_token,
+          isAuthenticated: true,
+        };
+
+        this.notifyListeners();
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Failed to verify email' };
+    }
+  }
+
+  async resendVerificationEmail(email: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Failed to resend verification email' };
     }
   }
 
